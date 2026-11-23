@@ -1,0 +1,27 @@
+# Build output
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Gradle / Kotlin caches (machine-specific)
+.gradle
+.kotlin/
+
+# Android Studio settings (personal: window layout, selected device, SDK paths)
+/.idea/
+*.iml
+
+# Your SDK location (machine-specific)
+local.properties
+
+# Signing keys and their passwords: NEVER commit these
+*.jks
+*.keystore
+keystore.properties
+
+# Scratch file from tools/logo/trace.py
+/tools/logo/mark.json
+
+# OS junk
+.DS_Store

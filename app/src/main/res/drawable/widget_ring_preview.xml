@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only used in the widget picker preview; the real ring is drawn by the app. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp" android:height="80dp" android:viewportWidth="80" android:viewportHeight="80">
+    <path android:strokeColor="#33B3474E" android:strokeWidth="9" android:fillColor="#00000000"
+        android:pathData="M40,8 A32,32 0 1,1 39.99,8" />
+    <path android:strokeColor="#FFB3474E" android:strokeWidth="9" android:fillColor="#00000000"
+        android:pathData="M40,8 A32,32 0 0,1 66,21" />
+</vector>

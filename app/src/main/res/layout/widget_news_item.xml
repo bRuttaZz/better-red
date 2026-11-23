@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One article row in the news widget list. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/news_item"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- divider (plain <View> isn't allowed in widgets) -->
+    <FrameLayout
+        android:id="@+id/news_item_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1F000000" />
+
+    <TextView
+        android:id="@+id/news_item_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textColor="#FF231919"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/news_item_meta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:paddingBottom="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="#FF857372"
+        android:textSize="11sp" />
+</LinearLayout>

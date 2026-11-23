@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In dark mode the "b" is a lighter grey so it stays readable on the dark splash. -->
+    <color name="logo_grey">#FFA8A8A8</color>
+    <color name="splash_background">#FF1A1111</color>
+</resources>

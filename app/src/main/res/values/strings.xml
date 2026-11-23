@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Better Red</string>
+    <!-- Widget picker (Android needs these as resources; everything else is in Words.kt) -->
+    <string name="widget_cycle_name">Cycle</string>
+    <string name="widget_cycle_description">Today’s cycle day, phase and next period</string>
+    <string name="widget_news_name">Doctor said</string>
+    <string name="widget_news_description">Latest articles from your feeds</string>
+</resources>

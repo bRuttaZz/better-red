@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:atom="http://www.w3.org/2005/Atom">
+<!-- Test fixture written for Better Red (GPL-3.0). Shaped like a WordPress RSS 2.0 feed; the content is made up. -->
+<channel>
+	<title>Example Health Collective</title>
+	<atom:link href="https://example.org/feed/" rel="self" type="application/rss+xml" />
+	<link>https://example.org</link>
+	<description>Made-up articles for testing</description>
+	<lastBuildDate>Thu, 29 Oct 2026 19:06:15 +0000</lastBuildDate>
+	<image><url>https://example.org/icon.png</url><title>Example Health Collective</title><link>https://example.org</link></image>
+	<item>
+		<title>Packing a Small Period Kit for School</title>
+		<link>https://example.org/2026/10/29/packing-a-small-period-kit/</link>
+		<dc:creator><![CDATA[Example Staff]]></dc:creator>
+		<pubDate>Thu, 29 Oct 2026 18:42:51 +0000</pubDate>
+		<category><![CDATA[Blog]]></category>
+		<guid isPermaLink="false">https://example.org/?p=101</guid>
+		<description><![CDATA[<p>A small pouch with a few supplies can make school days feel calmer. Here is what to put in it&#8230;</p>
+<p>The post <a href="https://example.org/2026/10/29/packing-a-small-period-kit/">Packing a Small Period Kit for School</a> appeared first on <a href="https://example.org">Example Health Collective</a>.</p>]]></description>
+	</item>
+	<item>
+		<title>Sleep &amp; Your Cycle</title>
+		<link>https://example.org/2026/10/28/sleep-and-your-cycle/</link>
+		<pubDate>Wed, 28 Oct 2026 13:38:51 +0000</pubDate>
+		<description><![CDATA[<p>Why some nights feel harder than others &mdash; and what can help.</p>]]></description>
+	</item>
+	<item>
+		<title>Iron-Rich Foods Worth Knowing</title>
+		<link>https://example.org/2026/09/24/iron-rich-foods/</link>
+		<pubDate>Thu, 24 Sep 2026 09:00:00 +0000</pubDate>
+		<description><![CDATA[<p>Lentils, spinach and a squeeze of lemon.</p>]]></description>
+	</item>
+</channel>
+</rss>

@@ -1,4 +1,4 @@
-<img src="./tools/logo/logo-round.png" alight="right" width="100px">
+<img src="./tools/logo/logo-round.png" align="right" width="100px">
     
 # Better Red
 

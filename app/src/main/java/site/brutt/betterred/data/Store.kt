@@ -19,7 +19,12 @@ import java.time.LocalDate
  * The whole app's storage: one plain SQLite file (better_red.db).
  *
  * Tables
- *   day_log  (date TEXT PK 'YYYY-MM-DD', flow TEXT, mood TEXT, symptoms TEXT csv, note TEXT, sex TEXT, updated_at INTEGER)
+ *   day_log  one row per logged day:
+ *              date        TEXT PK   'YYYY-MM-DD' (every query is by date)
+ *              period_day  INTEGER   1 = period day, 0 = not
+ *              data        TEXT      JSON with everything else (flow, mood, tags, note, sex): see DayJson.kt
+ *              updated_at  INTEGER   Unix time in seconds of the last change
+ *            New things to log go into the JSON, so they need no migration, and old rows keep working.
  *   settings (key TEXT PK, value TEXT)
  *   feed     (id INTEGER PK, url TEXT UNIQUE, title TEXT, enabled INTEGER, builtin INTEGER)   ← news sources
  *   read_item(link TEXT PK, read_at INTEGER)                                                ← articles she opened
@@ -35,16 +40,7 @@ class Store(private val context: Context) {
         init { setWriteAheadLoggingEnabled(false) }
 
         override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL(
-                """CREATE TABLE day_log(
-                    date TEXT PRIMARY KEY NOT NULL,
-                    flow TEXT,
-                    mood TEXT,
-                    symptoms TEXT NOT NULL DEFAULT '',
-                    note TEXT NOT NULL DEFAULT '',
-                    sex TEXT,
-                    updated_at INTEGER NOT NULL)"""
-            )
+            createDayLog(db, "day_log")
             db.execSQL("CREATE TABLE settings(key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)")
             createNewsTables(db)
         }
@@ -64,8 +60,32 @@ class Store(private val context: Context) {
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
             // One step per version, so old databases and old backups upgrade cleanly.
+            // (Android runs this inside a transaction: if any step fails, nothing changes.)
             if (oldVersion < 2) db.execSQL("ALTER TABLE day_log ADD COLUMN sex TEXT")
             if (oldVersion < 3) createNewsTables(db)
+            if (oldVersion < 4) moveDayLogToJson(db)
+        }
+
+        /** v4: the separate flow/mood/symptoms/note/sex columns become one JSON `data` column. */
+        private fun moveDayLogToJson(db: SQLiteDatabase) {
+            createDayLog(db, "day_log_v4")
+            db.rawQuery("SELECT date, flow, mood, symptoms, note, sex, updated_at FROM day_log", null).use { c ->
+                while (c.moveToNext()) {
+                    val date = runCatching { LocalDate.parse(c.getString(0)) }.getOrNull() ?: continue
+                    val log = DayLog(
+                        date = date,
+                        flow = enumOrNull<Flow>(c.getStringOrNull(1)),
+                        mood = enumOrNull<Mood>(c.getStringOrNull(2)),
+                        symptoms = c.getStringOrNull(3).orEmpty().split(',').mapNotNull { enumOrNull<Symptom>(it) }.toSet(),
+                        note = c.getStringOrNull(4).orEmpty(),
+                        sex = enumOrNull<Sex>(c.getStringOrNull(5)),
+                    )
+                    if (log.isEmpty) continue
+                    db.insert("day_log_v4", null, dayRow(log, DayJson.write(log), updatedAt = c.getLong(6) / 1000))
+                }
+            }
+            db.execSQL("DROP TABLE day_log")
+            db.execSQL("ALTER TABLE day_log_v4 RENAME TO day_log")
         }
     }
 
@@ -77,41 +97,46 @@ class Store(private val context: Context) {
     private val dbFile: File get() = context.getDatabasePath(DB_NAME)
 
     // ---------- day logs ----------
+    // Dates are stored as 'YYYY-MM-DD', so comparing the text compares the dates.
 
-    fun loadLogs(): Map<LocalDate, DayLog> {
+    /** Every logged day from [from] on (the app passes History.firstDay: the last 5 years). */
+    fun loadLogs(from: LocalDate): Map<LocalDate, DayLog> {
         val out = HashMap<LocalDate, DayLog>()
-        db.rawQuery("SELECT date, flow, mood, symptoms, note, sex FROM day_log", null).use { c ->
+        db.rawQuery("SELECT date, period_day, data FROM day_log WHERE date >= ?", arrayOf(from.toString())).use { c ->
             while (c.moveToNext()) {
                 val date = runCatching { LocalDate.parse(c.getString(0)) }.getOrNull() ?: continue
-                out[date] = DayLog(
-                    date = date,
-                    flow = c.getStringOrNull(1)?.let { enumOrNull<Flow>(it) },
-                    mood = c.getStringOrNull(2)?.let { enumOrNull<Mood>(it) },
-                    symptoms = c.getString(3).split(',').mapNotNull { enumOrNull<Symptom>(it) }.toSet(),
-                    note = c.getString(4),
-                    sex = c.getStringOrNull(5)?.let { enumOrNull<Sex>(it) },
-                )
+                out[date] = DayJson.read(date, c.getInt(1) == 1, c.getStringOrNull(2))
             }
         }
         return out
     }
 
+    /** Only the period days from [from] on (all the cycle math needs; used by the widgets). */
+    fun loadPeriodDays(from: LocalDate): Set<LocalDate> {
+        val out = HashSet<LocalDate>()
+        db.rawQuery("SELECT date FROM day_log WHERE period_day = 1 AND date >= ?", arrayOf(from.toString())).use { c ->
+            while (c.moveToNext()) runCatching { LocalDate.parse(c.getString(0)) }.getOrNull()?.let(out::add)
+        }
+        return out
+    }
+
+    /** Deletes every logged day before [first]. Called each time the app starts (the 5-year rule). */
+    fun deleteDaysBefore(first: LocalDate) {
+        db.delete("day_log", "date < ?", arrayOf(first.toString()))
+    }
+
     /** Saves the day, or deletes it if nothing is left on it. */
     fun saveLog(log: DayLog) {
-        if (log.isEmpty) {
-            db.delete("day_log", "date = ?", arrayOf(log.date.toString()))
+        val key = arrayOf(log.date.toString())
+        val previous = db.rawQuery("SELECT data FROM day_log WHERE date = ?", key).use { c ->
+            if (c.moveToFirst()) c.getStringOrNull(0) else null
+        }
+        val json = DayJson.write(log, previous)
+        if (log.isEmpty && json == "{}") {
+            db.delete("day_log", "date = ?", key)
             return
         }
-        val values = ContentValues().apply {
-            put("date", log.date.toString())
-            put("flow", log.flow?.name)
-            put("mood", log.mood?.name)
-            put("symptoms", log.symptoms.joinToString(",") { it.name })
-            put("note", log.note.trim())
-            put("sex", log.sex?.name)
-            put("updated_at", System.currentTimeMillis())
-        }
-        db.insertWithOnConflict("day_log", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        db.insertWithOnConflict("day_log", null, dayRow(log, json), SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     // ---------- settings ----------
@@ -226,7 +251,28 @@ class Store(private val context: Context) {
 
     companion object {
         const val DB_NAME = "better_red.db"
-        const val DB_VERSION = 3
+        /**
+         * Bump only when a table or column changes (and add a step to onUpgrade).
+         * New things logged per day go into the JSON instead and don't need a new version.
+         */
+        const val DB_VERSION = 4
+
+        private fun createDayLog(db: SQLiteDatabase, table: String) {
+            db.execSQL(
+                """CREATE TABLE $table(
+                    date TEXT PRIMARY KEY NOT NULL,
+                    period_day INTEGER NOT NULL DEFAULT 0 CHECK (period_day IN (0, 1)),
+                    data TEXT NOT NULL DEFAULT '{}',
+                    updated_at INTEGER NOT NULL)"""
+            )
+        }
+
+        private fun dayRow(log: DayLog, json: String, updatedAt: Long = System.currentTimeMillis() / 1000) = ContentValues().apply {
+            put("date", log.date.toString())
+            put("period_day", if (log.flow != null) 1 else 0)
+            put("data", json)
+            put("updated_at", updatedAt)
+        }
 
         private fun insertDefaultFeeds(db: SQLiteDatabase) {
             for ((url, title) in Feeds.DEFAULTS) {
@@ -238,6 +284,3 @@ class Store(private val context: Context) {
 }
 
 private fun android.database.Cursor.getStringOrNull(i: Int): String? = if (isNull(i)) null else getString(i)
-
-private inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
-    if (name.isBlank()) null else runCatching { enumValueOf<T>(name) }.getOrNull()

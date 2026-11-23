@@ -19,6 +19,7 @@ import site.brutt.betterred.data.ThemeMode
 import site.brutt.betterred.domain.CycleSettings
 import site.brutt.betterred.domain.DayLog
 import site.brutt.betterred.domain.Flow
+import site.brutt.betterred.domain.History
 import site.brutt.betterred.domain.Mood
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -76,7 +77,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
-    init { write { } }
+    // On start: forget days older than 5 years (History.YEARS), then load everything.
+    init { write { deleteDaysBefore(History.firstDay(LocalDate.now())) } }
 
     private fun write(done: String? = null, block: Store.() -> Unit) {
         viewModelScope.launch {
@@ -85,7 +87,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     runCatching {
                         store.block()
                         AppState(
-                            loaded = true, logs = store.loadLogs(), prefs = Prefs.from(store.loadSettings()),
+                            loaded = true, logs = store.loadLogs(History.firstDay(LocalDate.now())), prefs = Prefs.from(store.loadSettings()),
                             feeds = store.loadFeeds(), readLinks = store.loadReadLinks(),
                         )
                     }
@@ -146,7 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             for (i in 0 until periodLength) {
                 val d = lastPeriodStart.plusDays(i.toLong())
                 if (d.isAfter(today)) break
-                val existing = loadLogs()[d] ?: DayLog(d)
+                val existing = loadLogs(d)[d] ?: DayLog(d)
                 if (existing.flow == null) saveLog(existing.copy(flow = Flow.MEDIUM))
             }
         }

@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import site.brutt.betterred.Words
 import site.brutt.betterred.domain.DayLog
@@ -51,7 +52,7 @@ fun LogSheet(initial: DayLog, showSex: Boolean, onDismiss: () -> Unit, onSave: (
     var flow by remember { mutableStateOf(initial.flow) }
     var mood by remember { mutableStateOf(initial.mood) }
     var symptoms by remember { mutableStateOf(initial.symptoms) }
-    var note by remember { mutableStateOf(initial.note) }
+    var note by remember { mutableStateOf(initial.note.take(DayLog.NOTE_MAX)) }
     var sex by remember { mutableStateOf(initial.sex) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -113,8 +114,11 @@ fun LogSheet(initial: DayLog, showSex: Boolean, onDismiss: () -> Unit, onSave: (
 
             Section(Words.Log.NOTE)
             OutlinedTextField(
-                value = note, onValueChange = { note = it.take(500) },
+                value = note, onValueChange = { note = it.take(DayLog.NOTE_MAX) },
                 placeholder = { Text(Words.Log.NOTE_HINT) },
+                supportingText = {
+                    Text(Words.Log.noteCount(note.length, DayLog.NOTE_MAX), textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth())
+                },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
             )
 

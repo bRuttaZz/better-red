@@ -16,6 +16,8 @@ open-source libraries, whose licenses are compatible with the GPL v3.
 
 The Apache License 2.0 text is at https://www.apache.org/licenses/LICENSE-2.0
 
+Unit tests (not part of the app) also use JUnit (EPL 1.0) and org.json (public domain).
+
 ## jsoup
 
 ```

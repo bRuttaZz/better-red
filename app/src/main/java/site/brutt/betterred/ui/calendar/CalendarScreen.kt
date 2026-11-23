@@ -72,12 +72,14 @@ import site.brutt.betterred.domain.CycleCalculator
 import site.brutt.betterred.domain.CycleModel
 import site.brutt.betterred.domain.DayInfo
 import site.brutt.betterred.domain.DayLog
+import site.brutt.betterred.domain.History
 import site.brutt.betterred.domain.Mood
 import site.brutt.betterred.domain.Phase
 import site.brutt.betterred.domain.Wishes
 import site.brutt.betterred.domain.daysBetween
 import site.brutt.betterred.ui.AppState
 import site.brutt.betterred.ui.Avatar
+import site.brutt.betterred.ui.MoodIcons
 import site.brutt.betterred.ui.brand.BrandMark
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -110,7 +112,10 @@ fun CalendarScreen(
     var monthEpoch by rememberSaveable { mutableLongStateOf(today.withDayOfMonth(1).toEpochDay()) }
     var selectedEpoch by rememberSaveable { mutableLongStateOf(today.toEpochDay()) }
     var editing by remember { mutableStateOf(false) }
-    val month = LocalDate.ofEpochDay(monthEpoch)
+    // She can page back 5 years (History.YEARS), no further.
+    val firstMonth = History.firstDay(today)
+    val month = LocalDate.ofEpochDay(monthEpoch).coerceAtLeast(firstMonth)
+    val atFirstMonth = month == firstMonth
     val selected = LocalDate.ofEpochDay(selectedEpoch)
     val selectedLog = state.logs[selected] ?: DayLog(selected)
     val goToday = { selectedEpoch = today.toEpochDay(); monthEpoch = today.withDayOfMonth(1).toEpochDay() }
@@ -133,7 +138,7 @@ fun CalendarScreen(
 
         // Month switcher: < November 2026 >
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { monthEpoch = month.minusMonths(1).toEpochDay() }) {
+            IconButton(onClick = { monthEpoch = month.minusMonths(1).toEpochDay() }, enabled = !atFirstMonth) {
                 Icon(Icons.Rounded.ChevronLeft, contentDescription = Words.Calendar.PREV_MONTH)
             }
             Text(
@@ -148,6 +153,11 @@ fun CalendarScreen(
         MonthGrid(
             month = month, model = model, logs = state.logs, today = today, selected = selected,
             showFertility = prefs.showFertility, showSex = prefs.trackSex, onPick = { selectedEpoch = it.toEpochDay() },
+        )
+        if (atFirstMonth) Text(
+            Words.History.calendarLimit(History.YEARS), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
         )
 
         Spacer(Modifier.height(12.dp))
@@ -302,12 +312,13 @@ private fun DayCell(
             Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp).size(14.dp, 3.dp)
                 .clip(RoundedCornerShape(2.dp)).background(cs.onSurface)
         )
+        // Markers sit on the right edge: ♥ (sex logged) top right, • (notes) bottom right.
         if (hadSex) Icon(
             Icons.Rounded.Favorite, contentDescription = Words.Calendar.SEX_LOGGED, tint = cs.primary,
-            modifier = Modifier.align(Alignment.TopStart).padding(top = 1.dp, start = 1.dp).size(12.dp),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 1.dp, end = 1.dp).size(12.dp),
         )
         if (hasDetails) Box(
-            Modifier.align(Alignment.TopEnd).padding(top = 3.dp, end = 3.dp).size(7.dp)
+            Modifier.align(Alignment.BottomEnd).padding(bottom = 3.dp, end = 3.dp).size(7.dp)
                 .clip(CircleShape).background(cs.onSurfaceVariant)
         )
     }
@@ -510,7 +521,8 @@ fun MoodRow(selected: Mood?, onPick: (Mood) -> Unit) {
                 modifier = Modifier.weight(1f),
             ) {
                 Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(mood.emoji, fontSize = 22.sp)
+                    Icon(MoodIcons.of(mood), contentDescription = null, modifier = Modifier.size(26.dp))
+                    Spacer(Modifier.height(2.dp))
                     Text(mood.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }

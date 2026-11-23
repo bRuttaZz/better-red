@@ -10,6 +10,8 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import site.brutt.betterred.Words
+import site.brutt.betterred.ui.openExternally
+import site.brutt.betterred.domain.History
 import site.brutt.betterred.ui.theme.RedDarkScheme
 import site.brutt.betterred.ui.theme.RedLightScheme
 import site.brutt.betterred.ui.theme.Tones
@@ -45,7 +47,11 @@ import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Gavel
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.HealthAndSafety
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.VolunteerActivism
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.NightsStay
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Upload
@@ -98,6 +104,7 @@ fun ProfileScreen(state: AppState, vm: AppViewModel, today: LocalDate, modifier:
     var renaming by remember { mutableStateOf(false) }
     var pickingAvatar by remember { mutableStateOf(false) }
     var showLicenses by remember { mutableStateOf(false) }
+    var showCredits by remember { mutableStateOf(false) }
     val context = LocalContext.current
     // Read from the installed app, so it always matches versionName in app/build.gradle.kts.
     val appVersion = remember {
@@ -239,6 +246,7 @@ fun ProfileScreen(state: AppState, vm: AppViewModel, today: LocalDate, modifier:
                     confirmImport = true
                 }
             },
+            { InfoRow(Icons.Rounded.History, Words.History.profileTitle(History.YEARS), Words.History.PROFILE_SUB) },
             {
                 ClickRow(Icons.Rounded.DeleteForever, Words.Profile.DELETE, Words.Profile.DELETE_SUB, danger = true) {
                     confirmDelete = true
@@ -251,9 +259,12 @@ fun ProfileScreen(state: AppState, vm: AppViewModel, today: LocalDate, modifier:
             { InfoRow(Icons.Rounded.Info, Words.Profile.version(appVersion), Words.Profile.VERSION_SUB) },
             { InfoRow(Icons.Rounded.Gavel, Words.Profile.LICENSE, Words.Profile.LICENSE_SUB) },
             { ClickRow(Icons.Rounded.Code, Words.Profile.OSS, Words.Profile.OSS_SUB) { showLicenses = true } },
+            { ClickRow(Icons.Rounded.VolunteerActivism, Words.Profile.CREDITS, Words.Profile.CREDITS_SUB) { showCredits = true } },
             { InfoRow(Icons.Rounded.HealthAndSafety, Words.Profile.NOT_MEDICAL, Words.Profile.NOT_MEDICAL_SUB) },
         )
     }
+
+    if (showCredits) CreditsDialog(onDismiss = { showCredits = false })
 
     if (showLicenses) {
         AlertDialog(
@@ -386,6 +397,40 @@ private fun ClickRow(icon: ImageVector, title: String, sub: String, danger: Bool
             colors = rowColors,
         )
     }
+}
+
+/** Profile → About → Credits: the author (opens brutt.site) and the source code (opens GitHub). */
+@Composable
+private fun CreditsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    @Composable
+    fun LinkRow(icon: ImageVector, label: String, name: String, url: String) {
+        Surface(onClick = { openExternally(context, url) }, color = androidx.compose.ui.graphics.Color.Transparent, shape = MaterialTheme.shapes.medium) {
+            ListItem(
+                overlineContent = { Text(label) },
+                headlineContent = { Text(name, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) },
+                supportingContent = { Text(Words.Credits.shown(url)) },
+                leadingContent = { Icon(icon, null) },
+                trailingContent = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, Words.Credits.OPENS_IN_BROWSER) },
+                colors = rowColors,
+            )
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(Words.Credits.TITLE) },
+        text = {
+            Column {
+                LinkRow(Icons.Rounded.Person, Words.Credits.AUTHOR, Words.Credits.AUTHOR_NAME, Words.Credits.AUTHOR_URL)
+                LinkRow(Icons.Rounded.Code, Words.Credits.SOURCE, Words.Credits.shown(Words.Credits.SOURCE_URL).substringAfter('/'), Words.Credits.SOURCE_URL)
+                Text(
+                    Words.Credits.FOOTER, style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 12.dp),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(Words.Profile.DONE) } },
+    )
 }
 
 @Composable

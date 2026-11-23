@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import site.brutt.betterred.Words
+import site.brutt.betterred.domain.History
 import site.brutt.betterred.domain.CycleSettings
 import site.brutt.betterred.ui.brand.BrandMark
 import java.time.Instant
@@ -220,10 +221,11 @@ private fun Setup(
 
     if (picking) {
         val todayMillis = LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        val firstMillis = History.firstDay(LocalDate.now()).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = lastStart?.atStartOfDay()?.toInstant(ZoneOffset.UTC)?.toEpochMilli(),
             selectableDates = object : SelectableDates {
-                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= todayMillis
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis in firstMillis..todayMillis
             },
         )
         DatePickerDialog(

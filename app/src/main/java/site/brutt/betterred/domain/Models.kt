@@ -11,13 +11,14 @@ enum class Flow(val label: String) {
     HEAVY(Labels.FLOW_HEAVY),
 }
 
-enum class Mood(val emoji: String, val label: String) {
-    HAPPY("😊", Labels.MOOD_HAPPY),
-    CALM("😌", Labels.MOOD_CALM),
-    TIRED("😴", Labels.MOOD_TIRED),
-    LOW("😢", Labels.MOOD_LOW),
-    IRRITABLE("😤", Labels.MOOD_IRRITABLE),
-    ANXIOUS("😰", Labels.MOOD_ANXIOUS),
+/** Each mood is drawn as an outline face (ui/MoodIcons.kt), not an emoji. */
+enum class Mood(val label: String) {
+    HAPPY(Labels.MOOD_HAPPY),
+    CALM(Labels.MOOD_CALM),
+    TIRED(Labels.MOOD_TIRED),
+    LOW(Labels.MOOD_LOW),
+    IRRITABLE(Labels.MOOD_IRRITABLE),
+    ANXIOUS(Labels.MOOD_ANXIOUS),
 }
 
 /** Optional intimacy log. Never shared with a partner unless she chooses to (later). */
@@ -37,7 +38,10 @@ enum class Symptom(val label: String) {
     SPOTTING(Labels.SYM_SPOTTING),
 }
 
-/** Everything she logged for one day. A day with a [flow] counts as a period day. */
+/**
+ * Everything she logged for one day. A day with a [flow] counts as a period day.
+ * Stored as one row per day; see the table layout in data/Store.kt.
+ */
 data class DayLog(
     val date: LocalDate,
     val flow: Flow? = null,
@@ -48,4 +52,20 @@ data class DayLog(
 ) {
     val isEmpty: Boolean get() = flow == null && mood == null && symptoms.isEmpty() && note.isBlank() && sex == null
     val hasDetails: Boolean get() = mood != null || symptoms.isNotEmpty() || note.isNotBlank()
+
+    companion object {
+        /** Longest note she can write for one day. */
+        const val NOTE_MAX = 200
+    }
+}
+
+/**
+ * The app keeps only the last [YEARS] years, starting from the first day of that month.
+ * Older days are deleted from the database each time the app starts (AppViewModel), and are
+ * never loaded or shown. The same rule is written in README.md and shown in the app (Words.History).
+ */
+object History {
+    const val YEARS = 5
+
+    fun firstDay(today: LocalDate): LocalDate = today.minusYears(YEARS.toLong()).withDayOfMonth(1)
 }

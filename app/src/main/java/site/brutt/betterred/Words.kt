@@ -103,6 +103,7 @@ object Words {
         const val NOTE = "Note"
         const val NONE = "None"
         const val NOTE_HINT = "Anything worth remembering?"
+        fun noteCount(used: Int, max: Int) = "$used / $max"
         const val CANCEL = "Cancel"
         const val SAVE = "Save"
     }
@@ -193,6 +194,13 @@ object Words {
         const val CHANCE_LOW = "Low pregnancy chance"
         const val CHANCE_MEDIUM = "Moderate pregnancy chance"
         const val CHANCE_HIGH = "High pregnancy chance"
+    }
+
+    // ------------------------------------------------------------------ how far back the app goes (History.YEARS)
+    object History {
+        fun calendarLimit(years: Int) = "Better Red shows the last $years years."
+        fun profileTitle(years: Int) = "Keeps the last $years years"
+        const val PROFILE_SUB = "Older days are deleted from this phone when the app opens. Export a backup to keep them."
     }
 
     // ------------------------------------------------------------------ news ("Doctor said")
@@ -347,6 +355,8 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE."""
+        const val CREDITS = "Credits"
+        const val CREDITS_SUB = "Who made Better Red, and its source code"
         const val NOT_MEDICAL = "Not medical advice"
         const val NOT_MEDICAL_SUB = "Predictions are estimates. Not a form of birth control."
 
@@ -366,6 +376,20 @@ SOFTWARE."""
         const val DONE = "Done"
         const val OK = "OK"
         fun exportFileName(date: String) = "better-red-$date.db"
+    }
+
+    // ------------------------------------------------------------------ credits (Profile → About → Credits)
+    object Credits {
+        const val TITLE = "Credits"
+        const val AUTHOR = "Author"
+        const val AUTHOR_NAME = "bruttazz"
+        const val AUTHOR_URL = "https://brutt.site"
+        const val SOURCE = "Source code"
+        const val SOURCE_URL = "https://github.com/bRuttaZz/better-red"
+        const val FOOTER = "Made with love for Better."
+        const val OPENS_IN_BROWSER = "Opens in your browser"
+        /** The link shown under a name: the address without "https://". */
+        fun shown(url: String) = url.removePrefix("https://")
     }
 
     // ------------------------------------------------------------------ short messages (snackbar)

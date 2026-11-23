@@ -1,7 +1,6 @@
 package site.brutt.betterred.ui.news
 
 import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -74,6 +73,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import site.brutt.betterred.Words
+import site.brutt.betterred.ui.openExternally
 import site.brutt.betterred.data.Article
 import site.brutt.betterred.data.Block
 import site.brutt.betterred.data.ReadMode
@@ -282,13 +282,5 @@ private fun OriginalPage(url: String, onWebView: (WebView?) -> Unit) {
             },
             onRelease = { onWebView(null); it.stopLoading(); it.destroy() },
         )
-    }
-}
-
-private fun openExternally(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (_: ActivityNotFoundException) {
-        // nothing on the phone can open it; ignore
     }
 }

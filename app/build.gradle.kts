@@ -47,9 +47,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            // R8 shrinks and optimizes the whole app (default scope "**"). Don't limit packageScope to
+            // some packages: half-optimized code crashed at start (IllegalAccessError). Extra keep
+            // rules live in src/main/keepRules/. Always test a release build before tagging.
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
             }
         }
     }

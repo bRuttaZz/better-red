@@ -1,12 +1,8 @@
-# Add project specific R8 rules here.
-# AGP will combine all keep rule files in src/main/keepRules to pass to R8
-#
-# For more details, see
-#   https://d.android.com/r/tools/r8/keep-rules
+# R8 keep rules for the release build (AGP combines every file in src/main/keepRules).
+# https://d.android.com/r/tools/r8/keep-rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# WorkManager (partner sharing sync) keeps its jobs in a Room database. Room creates it by
+# reflection, through the no-argument constructor of the generated WorkDatabase_Impl. Room 2.6's own
+# rule keeps the class but not that constructor, and R8's full mode then removes it: the release
+# app crashed at start ("NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>").
+-keep class * extends androidx.room.RoomDatabase { <init>(); }

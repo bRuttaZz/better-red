@@ -38,6 +38,9 @@ Then add the repository secrets on GitHub → Settings → Secrets and variables
 
 ## Making a release
 
+0. **Test a release build first** (debug builds don't run R8, the optimizer that can break things
+   only in release): `make apk KEYSTORE=…`, install `dist/*.apk` on the emulator, and try start-up,
+   onboarding, logging a day, a restart, the news tab and pairing.
 1. In `app/build.gradle.kts`: set `versionName` (what people see, e.g. `"1.1.0"`) and **raise
    `versionCode` by 1** (Android refuses an update whose code isn't higher).
 2. Commit, then tag and push:

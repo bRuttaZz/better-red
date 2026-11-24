@@ -140,6 +140,10 @@ JAVA_HOME=$(ls -d /var/lib/flatpak/app/com.google.AndroidStudio/x86_64/stable/*/
   Release signing comes from `BR_KEYSTORE_*` env vars or a git-ignored `keystore.properties`;
   without them the release APK is unsigned. When `compileSdk`/AGP change, update the Dockerfile's
   SDK `ARG`s.
+- **Release builds use R8** (whole app; never narrow `optimization.packageScope`: that crashed at
+  start). Keep rules for reflection go in `app/src/main/keepRules/rules.keep` (one for Room/WorkManager
+  is there). Debug builds don't run R8, so **test a release APK on the emulator before tagging**:
+  start, onboarding, log a day, restart, news, pairing. One universal APK (native libs are ~200 KB).
 - The owner's Pixel may be connected over wireless adb. It holds **real data**: before installing a
   build that changes the database, back it up first:
   `adb exec-out run-as site.brutt.betterRed cat databases/better_red.db > ../backups/<name>.db`

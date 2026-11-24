@@ -4,9 +4,10 @@
 
 [![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/)
 ![Workflow status](https://github.com/bruttazz/better-red/actions/workflows/release.yml/badge.svg)
-[![Release](https://img.shields.io/github/release/bruttazz/better-red.svg?style=flat-square)](https://github.com/bruttazz/better-red/releases/latest)
 
 > ⚠️ Vibe coded
+
+APK Download: [![Release](https://img.shields.io/github/release/bruttazz/better-red.svg?style=flat-square)](https://github.com/bruttazz/better-red/releases/latest)
 
 A simple, private period tracker for Android. No account, no servers: everything stays in one
 SQLite file on the phone, which can be exported and imported from Profile.

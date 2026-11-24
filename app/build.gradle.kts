@@ -28,7 +28,7 @@ android {
         // The one place to change the version. versionName is what people see ("1.0.0");
         // versionCode must go up by 1 for every release you install over an older one.
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

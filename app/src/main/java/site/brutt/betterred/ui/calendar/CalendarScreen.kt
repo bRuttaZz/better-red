@@ -106,6 +106,8 @@ fun CalendarScreen(
     modifier: Modifier = Modifier,
 ) {
     val prefs = state.prefs
+    // On the partner's phone: her name; everything is view only.
+    val partnerName: String? = if (state.isPartner) state.share.partnerName.orEmpty() else null
     val model = remember(state.periodDays, prefs.cycle, today) {
         CycleCalculator.model(state.periodDays, prefs.cycle, today)
     }
@@ -163,12 +165,15 @@ fun CalendarScreen(
         Spacer(Modifier.height(12.dp))
         DayCard(
             info = CycleCalculator.dayInfo(selected, model), model = model, isToday = selected == today,
-            name = prefs.name, showFertility = prefs.showFertility, onBackToToday = goToday,
+            name = prefs.name, showFertility = prefs.showFertility, onBackToToday = goToday, partnerName = partnerName,
         )
 
         if (!selected.isAfter(today)) {
             Spacer(Modifier.height(10.dp))
-            LogCard(log = selectedLog, isToday = selected == today, showSex = prefs.trackSex, onMood = { onMood(selected, it) })
+            LogCard(
+                log = selectedLog, isToday = selected == today, showSex = prefs.trackSex && partnerName == null,
+                onMood = { onMood(selected, it) }, partnerName = partnerName, showMood = partnerName == null || prefs.share.mood,
+            )
         }
 
         if (model.hasData) {
@@ -177,7 +182,13 @@ fun CalendarScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-        if (selected.isAfter(today)) {
+        if (partnerName != null) {
+            Text(
+                Words.Partner.viewOnlyBanner(partnerName), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (selected.isAfter(today)) {
             Text(
                 Words.Calendar.FUTURE_NOTE, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
@@ -200,7 +211,7 @@ fun CalendarScreen(
         }
     }
 
-    if (editing) {
+    if (editing && partnerName == null) {
         LogSheet(initial = selectedLog, showSex = prefs.trackSex, onDismiss = { editing = false }, onSave = { onSaveLog(it); editing = false })
     }
 }
@@ -362,12 +373,19 @@ private fun DayCard(
     name: String,
     showFertility: Boolean,
     onBackToToday: () -> Unit,
+    partnerName: String?,
 ) {
     val cs = MaterialTheme.colorScheme
     val label = Wishes.label(info.phase, showFertility)
     // The wish is only for today. Other days just show the date and the phase.
     val (eyebrow, title, body) = when {
         !isToday -> Triple(info.date.format(longDate).uppercase(), label ?: Words.Calendar.NO_PREDICTION, null)
+        // The partner's phone: how to support her today, instead of a wish.
+        partnerName != null -> Triple(
+            "${Wishes.greeting()} · ${info.date.format(longDate)}".uppercase(),
+            Words.Partner.supportTitle(partnerName),
+            Wishes.support(if (model.hasData) info.phase else null, partnerName),
+        )
         !model.hasData -> {
             val (t, b) = Wishes.wish(null, info.date, name)
             Triple(Wishes.greeting().uppercase(), t, b)
@@ -478,16 +496,29 @@ fun CycleRing(info: DayInfo, model: CycleModel, showFertility: Boolean, ringSize
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LogCard(log: DayLog, isToday: Boolean, showSex: Boolean, onMood: (Mood) -> Unit) {
+private fun LogCard(
+    log: DayLog, isToday: Boolean, showSex: Boolean, onMood: (Mood) -> Unit,
+    partnerName: String? = null, showMood: Boolean = true,
+) {
     val cs = MaterialTheme.colorScheme
     Surface(shape = RoundedCornerShape(24.dp), color = cs.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                if (isToday) Words.Calendar.HOW_ARE_YOU else Words.Calendar.notesFor(log.date.format(shortDate)),
+                when {
+                    partnerName != null && isToday -> Words.Partner.today(partnerName)
+                    partnerName != null -> Words.Partner.onDay(partnerName, log.date.format(shortDate))
+                    isToday -> Words.Calendar.HOW_ARE_YOU
+                    else -> Words.Calendar.notesFor(log.date.format(shortDate))
+                },
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(Modifier.height(10.dp))
-            MoodRow(selected = log.mood, onPick = onMood)
+            when {
+                !showMood -> Unit
+                partnerName != null && log.mood == null ->
+                    Text(Words.Partner.NO_MOOD, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+                else -> MoodRow(selected = log.mood, onPick = onMood, enabled = partnerName == null)
+            }
             val chips = buildList {
                 log.flow?.let { add(Words.Calendar.flowChip(it.label)) }
                 if (showSex) log.sex?.let { add(Words.Calendar.sexChip(it.label)) }
@@ -507,13 +538,14 @@ private fun LogCard(log: DayLog, isToday: Boolean, showSex: Boolean, onMood: (Mo
 }
 
 @Composable
-fun MoodRow(selected: Mood?, onPick: (Mood) -> Unit) {
+fun MoodRow(selected: Mood?, onPick: (Mood) -> Unit, enabled: Boolean = true) {
     val cs = MaterialTheme.colorScheme
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Mood.entries.forEach { mood ->
             val on = mood == selected
             Surface(
                 onClick = { onPick(mood) },
+                enabled = enabled,
                 shape = RoundedCornerShape(16.dp),
                 color = if (on) cs.primaryContainer else Color.Transparent,
                 contentColor = if (on) cs.onPrimaryContainer else cs.onSurfaceVariant,

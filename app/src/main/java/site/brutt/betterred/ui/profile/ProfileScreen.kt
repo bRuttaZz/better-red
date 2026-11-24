@@ -147,58 +147,60 @@ fun ProfileScreen(state: AppState, vm: AppViewModel, today: LocalDate, modifier:
             }
         }
 
-        // ---- cycle
-        SectionTitle(Words.Profile.SECTION_CYCLE)
-        Group(
-            {
-                Column(Modifier.padding(16.dp)) {
-                    Row {
-                        Kpi("${model.cycleLength}", Words.Profile.AVG_CYCLE, Modifier.weight(1f))
-                        Kpi("${model.periodLength}", Words.Profile.AVG_PERIOD, Modifier.weight(1f))
-                        Kpi("${model.periods.size}", Words.Profile.PERIODS_LOGGED, Modifier.weight(1f))
+        // ---- cycle (on a partner's phone these are her numbers, set by her phone: not shown)
+        if (!state.isPartner) {
+            SectionTitle(Words.Profile.SECTION_CYCLE)
+            Group(
+                {
+                    Column(Modifier.padding(16.dp)) {
+                        Row {
+                            Kpi("${model.cycleLength}", Words.Profile.AVG_CYCLE, Modifier.weight(1f))
+                            Kpi("${model.periodLength}", Words.Profile.AVG_PERIOD, Modifier.weight(1f))
+                            Kpi("${model.periods.size}", Words.Profile.PERIODS_LOGGED, Modifier.weight(1f))
+                        }
+                        CycleBars(model.gaps.filter { it in CycleSettings.CYCLE_RANGE }.takeLast(6))
                     }
-                    CycleBars(model.gaps.filter { it in CycleSettings.CYCLE_RANGE }.takeLast(6))
-                }
-            },
-            {
-                SwitchRow(
-                    Icons.Rounded.Egg, Words.Profile.SHOW_FERTILITY, Words.Profile.SHOW_FERTILITY_SUB,
-                    prefs.showFertility, vm::setShowFertility,
-                )
-            },
-            {
-                SwitchRow(
-                    Icons.Rounded.Favorite, Words.Profile.LOG_SEX, Words.Profile.LOG_SEX_SUB,
-                    prefs.trackSex, vm::setTrackSex,
-                )
-            },
-            {
-                SwitchRow(
-                    Icons.Rounded.AutoGraph, Words.Profile.AUTO_ADJUST, Words.Profile.AUTO_ADJUST_SUB,
-                    prefs.cycle.autoAdjust, vm::setAutoAdjust,
-                )
-            },
-            {
-                val auto = prefs.cycle.autoAdjust
-                StepperRow(
-                    Icons.Rounded.Autorenew, Words.Profile.CYCLE_LENGTH, if (auto) Words.Profile.CALCULATED else Words.Profile.SET_BY_YOU,
-                    if (auto) model.cycleLength else prefs.cycle.cycleLength, CycleSettings.CYCLE_RANGE, !auto, vm::setCycleLength,
-                )
-            },
-            {
-                val auto = prefs.cycle.autoAdjust
-                StepperRow(
-                    Icons.Rounded.WaterDrop, Words.Profile.PERIOD_LENGTH, if (auto) Words.Profile.CALCULATED else Words.Profile.SET_BY_YOU,
-                    if (auto) model.periodLength else prefs.cycle.periodLength, CycleSettings.PERIOD_RANGE, !auto, vm::setPeriodLength,
-                )
-            },
-            {
-                StepperRow(
-                    Icons.Rounded.NightsStay, Words.Profile.LUTEAL, Words.Profile.LUTEAL_SUB,
-                    prefs.cycle.lutealLength, CycleSettings.LUTEAL_RANGE, true, vm::setLutealLength,
-                )
-            },
-        )
+                },
+                {
+                    SwitchRow(
+                        Icons.Rounded.Egg, Words.Profile.SHOW_FERTILITY, Words.Profile.SHOW_FERTILITY_SUB,
+                        prefs.showFertility, vm::setShowFertility,
+                    )
+                },
+                {
+                    SwitchRow(
+                        Icons.Rounded.Favorite, Words.Profile.LOG_SEX, Words.Profile.LOG_SEX_SUB,
+                        prefs.trackSex, vm::setTrackSex,
+                    )
+                },
+                {
+                    SwitchRow(
+                        Icons.Rounded.AutoGraph, Words.Profile.AUTO_ADJUST, Words.Profile.AUTO_ADJUST_SUB,
+                        prefs.cycle.autoAdjust, vm::setAutoAdjust,
+                    )
+                },
+                {
+                    val auto = prefs.cycle.autoAdjust
+                    StepperRow(
+                        Icons.Rounded.Autorenew, Words.Profile.CYCLE_LENGTH, if (auto) Words.Profile.CALCULATED else Words.Profile.SET_BY_YOU,
+                        if (auto) model.cycleLength else prefs.cycle.cycleLength, CycleSettings.CYCLE_RANGE, !auto, vm::setCycleLength,
+                    )
+                },
+                {
+                    val auto = prefs.cycle.autoAdjust
+                    StepperRow(
+                        Icons.Rounded.WaterDrop, Words.Profile.PERIOD_LENGTH, if (auto) Words.Profile.CALCULATED else Words.Profile.SET_BY_YOU,
+                        if (auto) model.periodLength else prefs.cycle.periodLength, CycleSettings.PERIOD_RANGE, !auto, vm::setPeriodLength,
+                    )
+                },
+                {
+                    StepperRow(
+                        Icons.Rounded.NightsStay, Words.Profile.LUTEAL, Words.Profile.LUTEAL_SUB,
+                        prefs.cycle.lutealLength, CycleSettings.LUTEAL_RANGE, true, vm::setLutealLength,
+                    )
+                },
+            )
+        }
 
         // ---- appearance
         SectionTitle(Words.Profile.SECTION_LOOK)
@@ -233,9 +235,15 @@ fun ProfileScreen(state: AppState, vm: AppViewModel, today: LocalDate, modifier:
             },
         )
 
-        // ---- data
+        // ---- data (a partner's phone only has her shared days: no backups there)
         SectionTitle(Words.Profile.SECTION_DATA)
-        Group(
+        if (state.isPartner) Group(
+            {
+                ClickRow(Icons.Rounded.DeleteForever, Words.Profile.DELETE, Words.Profile.DELETE_SUB, danger = true) {
+                    confirmDelete = true
+                }
+            },
+        ) else Group(
             {
                 ClickRow(Icons.Rounded.Upload, Words.Profile.EXPORT, Words.Profile.EXPORT_SUB) {
                     exportLauncher.launch(Words.Profile.exportFileName(today.toString()))

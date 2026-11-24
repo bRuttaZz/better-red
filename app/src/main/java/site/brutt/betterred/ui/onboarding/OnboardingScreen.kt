@@ -68,12 +68,13 @@ import java.util.Locale
 
 /**
  * First launch: welcome → who is this for → last period + usual lengths.
- * The partner option is shown but not available yet (pairing comes later).
+ * "For my partner" goes to scanning her pairing code instead ([onPartner]).
  */
 @Composable
 fun OnboardingScreen(
     onFinish: (name: String, lastPeriodStart: LocalDate?, cycleLength: Int, periodLength: Int) -> Unit,
     onImport: () -> Unit,
+    onPartner: () -> Unit,
 ) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     var name by rememberSaveable { mutableStateOf("") }
@@ -100,7 +101,7 @@ fun OnboardingScreen(
         }
         when (step) {
             0 -> Welcome(onNext = { step = 1 }, onImport = onImport)
-            1 -> WhoFor(onNext = { step = 2 })
+            1 -> WhoFor(onMe = { step = 2 }, onPartner = onPartner)
             else -> Setup(
                 name = name, onName = { name = it.take(24) },
                 lastStart = lastStartEpoch?.let(LocalDate::ofEpochDay), onLastStart = { lastStartEpoch = it?.toEpochDay() },
@@ -137,20 +138,23 @@ private fun Welcome(onNext: () -> Unit, onImport: () -> Unit) {
 }
 
 @Composable
-private fun WhoFor(onNext: () -> Unit) {
+private fun WhoFor(onMe: () -> Unit, onPartner: () -> Unit) {
+    var forPartner by rememberSaveable { mutableStateOf(false) }
     Text(Words.Welcome.WHO_TITLE, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
     Text(Words.Welcome.WHO_SUB, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(Modifier.height(12.dp))
-    Option(Icons.Rounded.WaterDrop, Words.Welcome.FOR_ME, Words.Welcome.FOR_ME_SUB, selected = true, enabled = true)
-    Option(Icons.Rounded.Favorite, Words.Welcome.FOR_PARTNER, Words.Welcome.FOR_PARTNER_SUB, selected = false, enabled = false)
+    Option(Icons.Rounded.WaterDrop, Words.Welcome.FOR_ME, Words.Welcome.FOR_ME_SUB, selected = !forPartner, enabled = true) { forPartner = false }
+    Option(Icons.Rounded.Favorite, Words.Welcome.FOR_PARTNER, Words.Welcome.FOR_PARTNER_SUB, selected = forPartner, enabled = true) { forPartner = true }
     Spacer(Modifier.height(32.dp))
-    Button(onClick = onNext, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text(Words.Welcome.CONTINUE) }
+    Button(onClick = { if (forPartner) onPartner() else onMe() }, modifier = Modifier.fillMaxWidth().height(56.dp)) { Text(Words.Welcome.CONTINUE) }
 }
 
 @Composable
-private fun Option(icon: ImageVector, title: String, sub: String, selected: Boolean, enabled: Boolean) {
+private fun Option(icon: ImageVector, title: String, sub: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
     Surface(
+        onClick = onClick,
+        enabled = enabled,
         shape = RoundedCornerShape(24.dp),
         color = if (selected) cs.primaryContainer else cs.surfaceContainerLow,
         contentColor = if (selected) cs.onPrimaryContainer else cs.onSurface,

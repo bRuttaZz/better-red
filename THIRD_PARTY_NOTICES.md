@@ -7,6 +7,10 @@ open-source libraries, whose licenses are compatible with the GPL v3.
 |---|---|---|
 | AndroidX / Jetpack Compose / Material 3 / Material Icons | The Android Open Source Project | Apache License 2.0 |
 | AndroidX Core Splashscreen | The Android Open Source Project | Apache License 2.0 |
+| AndroidX WorkManager (and Room, which it uses) | The Android Open Source Project | Apache License 2.0 |
+| AndroidX CameraX | The Android Open Source Project | Apache License 2.0 |
+| ZXing core (QR codes) | ZXing authors | Apache License 2.0 |
+| AutoValue annotations | Google LLC | Apache License 2.0 |
 | Kotlin standard library | JetBrains s.r.o. and Kotlin contributors | Apache License 2.0 |
 | kotlinx.coroutines | JetBrains s.r.o. and contributors | Apache License 2.0 |
 | JetBrains annotations | JetBrains s.r.o. | Apache License 2.0 |

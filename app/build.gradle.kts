@@ -1,7 +1,19 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Release signing (docs/releasing.md). From environment variables (the Docker build, CI) or else
+// from keystore.properties in the project folder (local; never committed). With neither, the
+// release APK is built unsigned.
+val keystoreProperties = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.isFile }?.reader()?.use { load(it) }
+}
+fun signing(env: String, property: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keystoreProperties.getProperty(property)
+val releaseKeystore = signing("BR_KEYSTORE_FILE", "storeFile")
 
 android {
     namespace = "site.brutt.betterred"
@@ -21,8 +33,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseKeystore)
+                storePassword = signing("BR_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signing("BR_KEY_ALIAS", "keyAlias")
+                keyPassword = signing("BR_KEY_PASSWORD", "keyPassword") ?: storePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
@@ -51,6 +75,12 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.compose.material.icons.extended)
+    // Partner sharing: background sync, QR codes (make + read), camera for scanning.
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.zxing.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     testImplementation(libs.junit)
     testImplementation(libs.org.json) // Android has org.json built in; plain JVM unit tests need a real copy (tests only, not in the app)
     androidTestImplementation(platform(libs.androidx.compose.bom))

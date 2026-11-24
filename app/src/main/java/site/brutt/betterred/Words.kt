@@ -1,5 +1,7 @@
 package site.brutt.betterred
 
+import site.brutt.betterred.share.SyncError
+
 /**
  * EVERY piece of text the app shows lives in this file, so it can be reviewed and edited in one place.
  *
@@ -32,7 +34,7 @@ object Words {
         const val FOR_ME = "For me"
         const val FOR_ME_SUB = "Track my own cycle, mood and symptoms."
         const val FOR_PARTNER = "For my partner"
-        const val FOR_PARTNER_SUB = "See what my partner shares with me. Coming soon."
+        const val FOR_PARTNER_SUB = "See what my partner shares with me. View only."
         const val CONTINUE = "Continue"
 
         const val SETUP_TITLE = "A little about you"
@@ -263,10 +265,130 @@ object Words {
             listOfNotNull(if (isNew) "■ New" else null, source, ago.ifEmpty { null }).joinToString(" · ")
     }
 
-    // ------------------------------------------------------------------ partner (placeholder for now)
+    // ------------------------------------------------------------------ partner sharing
     object Partner {
-        const val SOON_TITLE = "Partner sharing is on the way"
-        const val SOON_BODY = "Pair by QR code. You decide what they can see. End-to-end encrypted, no accounts."
+        const val TITLE = "Partner"
+
+        // Her phone, before sharing
+        const val SHARE_TITLE = "Share with your partner"
+        const val SHARE_BODY = "Let your partner see your period dates, plus anything else you choose to share. They can look, never change."
+        const val B_PAIR = "Pair in person"
+        const val B_PAIR_SUB = "Your partner scans a code on your phone. No accounts, no email."
+        const val B_E2E = "End-to-end encrypted"
+        const val B_E2E_SUB = "Updates pass through a small server in scrambled form. Only your partner’s phone can read them."
+        const val B_CONTROL = "You’re in control"
+        const val B_CONTROL_SUB = "You decide what’s shared, and you can stop at any time."
+        const val SERVER = "Server"
+        const val CHANGE = "Change"
+        const val SERVER_HINT = "Domain only, like better-red.brutt.site"
+        const val BAD_SERVER = "That doesn’t look like a server address (a domain like better-red.brutt.site)."
+        const val START = "Show pairing code"
+        const val STARTING = "Getting a code…"
+
+        // The pairing code screen
+        const val CODE_TITLE = "Pair your partner"
+        const val CODE_SUB = "On your partner’s phone: install Better Red, choose “For my partner”, and scan this code."
+        const val CODE_WARNING = "Anyone who scans this code can see what you share. Show it only to your partner. It’s shown once: if you close it, make a new one."
+        const val FINGERPRINT = "Both phones show this code"
+        const val DONE = "Done"
+
+        // Her phone, while sharing
+        const val YOUR_PARTNER = "Your partner"
+        const val CAN_VIEW = "Can view"
+        const val WHAT_THEY_SEE = "What your partner can see"
+        const val PERIOD = "Period dates"
+        const val PERIOD_SUB = "Logged and expected periods"
+        const val MOOD = "Mood"
+        const val MOOD_SUB = "Daily mood check-ins"
+        const val FERTILITY = "Fertility"
+        const val FERTILITY_SUB = "Fertile window, ovulation, pregnancy chance"
+        const val SYMPTOMS = "Symptoms"
+        const val SYMPTOMS_SUB = "Cramps, headaches, and so on"
+        const val NOTES = "Notes"
+        const val NOTES_SUB = "Your written notes"
+        const val SEX_NEVER = "Sex is never shared."
+        fun lastDays(days: Int) = "Only the last $days days are shared."
+        const val SECTION_SYNC = "Sync"
+        const val ENCRYPTED = "End-to-end encrypted"
+        fun fingerprint(fp: String) = "Key fingerprint $fp"
+        const val SYNC_NOW = "Sync now"
+        const val NEW_CODE = "New pairing code"
+        const val NEW_CODE_SUB = "Disconnects your current partner"
+        const val STOP = "Stop sharing"
+        const val STOP_SUB = "Deletes your shared data from the server"
+
+        const val NEW_CODE_TITLE = "Make a new pairing code?"
+        const val NEW_CODE_BODY = "Proceeding removes your existing connection: your current partner stops seeing your data until they scan the new code."
+        const val NEW_CODE_CONFIRM = "Continue"
+        const val STOP_TITLE = "Stop sharing?"
+        const val STOP_BODY = "Your shared data is deleted from the server and your partner can’t see it any more. Nothing on this phone changes."
+        const val STOP_CONFIRM = "Stop sharing"
+        const val CANCEL = "Cancel"
+
+        // Status lines
+        fun sharingSynced(ago: String) = "Sharing · synced $ago"
+        const val SHARING_NOT_YET = "Sharing · not synced yet"
+        fun connectedSynced(ago: String) = "Connected · synced $ago"
+        const val CONNECTED_WAITING = "Connected · waiting for her phone"
+        const val VIEW_ONLY = "View only"
+
+        // The partner's phone
+        fun sharesWithYou(name: String) = "${name.ifBlank { "She" }} shares with you"
+        const val SCAN_NEW = "Scan a new code"
+        const val SCAN_NEW_SUB = "If she made a new pairing code"
+        const val DISCONNECT = "Disconnect"
+        const val DISCONNECT_SUB = "Removes her data from this phone"
+        const val DISCONNECT_TITLE = "Disconnect?"
+        fun disconnectBody(name: String) = "This removes ${name.ifBlank { "her" }}’s data from this phone. To connect again, scan a new code from her phone."
+        fun supportTitle(name: String) = "How to support ${name.ifBlank { "her" }} today"
+        fun onDay(name: String, date: String) = "${name.ifBlank { "Her" }} on $date"
+        fun today(name: String) = "${name.ifBlank { "Her" }} today"
+        const val NO_MOOD = "No mood logged."
+        fun viewOnlyBanner(name: String) = "View only · ${name.ifBlank { "her" }}’s cycle"
+
+        // Scanning (partner)
+        const val SCAN_TITLE = "Scan the code"
+        const val SCAN_SUB = "On her phone: Partner → Show pairing code. Point your camera at it."
+        const val SCAN_UPLOAD = "Upload a screenshot instead"
+        const val SCAN_NO_CAMERA = "Allow the camera to scan the code, or upload a screenshot of it."
+        const val SCAN_ALLOW = "Allow camera"
+        const val SCAN_LOOKING = "Looking for a code…"
+        const val CONNECTING = "Connecting…"
+        const val NOT_A_CODE = "That isn’t a Better Red pairing code."
+        const val NO_CODE_IN_IMAGE = "Couldn’t find a pairing code in that picture."
+
+        // Messages
+        const val SYNCED = "Synced"
+        const val STOPPED = "Sharing stopped. Your data was deleted from the server."
+        const val STOPPED_OFFLINE = "Sharing stopped. The server couldn’t be reached; it deletes your data by itself after 10 days."
+
+        /** Problems as seen on her phone. */
+        fun error(e: SyncError): String = when (e) {
+            SyncError.OFFLINE -> "Couldn’t reach the server. It will try again when you’re online."
+            SyncError.WAITING -> "The server has nothing yet. It will be sent again shortly."
+            SyncError.INVALID -> "The server no longer accepts this pairing (maybe the server changed). Stop sharing and make a new pairing code."
+            SyncError.CLOCK -> "The server refused the sign-in code. Check that the phone’s date and time are set automatically."
+            SyncError.SERVER -> "The server had a problem. It will try again later."
+            SyncError.DATA -> "Something couldn’t be prepared for sharing. It will try again later."
+        }
+
+        /** The same problems, as seen on the partner's phone. */
+        fun partnerError(e: SyncError, name: String): String = when (e) {
+            SyncError.WAITING -> "Waiting for ${name.ifBlank { "her" }}’s phone to send updates."
+            SyncError.INVALID -> "This connection isn’t accepted by the server any more. Scan a new code from her phone."
+            SyncError.DATA -> "The shared data couldn’t be read. Scan a new code from her phone."
+            else -> error(e)
+        }
+
+        fun ago(seconds: Long, now: Long): String {
+            val d = (now - seconds).coerceAtLeast(0)
+            return when {
+                d < 60 -> "just now"
+                d < 3600 -> "${d / 60} min ago"
+                d < 86_400 -> "${d / 3600} h ago"
+                else -> "${d / 86_400} d ago"
+            }
+        }
     }
 
     // ------------------------------------------------------------------ profile
@@ -326,7 +448,9 @@ object Words {
         const val OSS_SUB = "The libraries Better Red is built with"
         const val OSS_TEXT = """Better Red is free software under the GNU GPL v3. It uses these open-source libraries:
 
-• AndroidX, Jetpack Compose, Material 3 and Material Icons, Core Splashscreen — The Android Open Source Project, Apache License 2.0
+• AndroidX, Jetpack Compose, Material 3 and Material Icons, Core Splashscreen, WorkManager, Room, CameraX — The Android Open Source Project, Apache License 2.0
+• ZXing core — ZXing authors, Apache License 2.0
+• AutoValue annotations — Google LLC, Apache License 2.0
 • Kotlin standard library, kotlinx.coroutines, JetBrains annotations — JetBrains s.r.o. and contributors, Apache License 2.0
 • JSpecify — The JSpecify Authors, Apache License 2.0
 • Guava ListenableFuture — The Guava Authors, Apache License 2.0

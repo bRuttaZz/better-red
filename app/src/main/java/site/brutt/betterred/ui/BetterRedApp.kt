@@ -41,6 +41,8 @@ import site.brutt.betterred.widget.Widgets
 import site.brutt.betterred.ui.news.ArticleScreen
 import site.brutt.betterred.ui.news.NewsScreen
 import site.brutt.betterred.ui.onboarding.OnboardingScreen
+import site.brutt.betterred.ui.partner.PartnerScreen
+import site.brutt.betterred.ui.partner.ScanScreen
 import site.brutt.betterred.ui.profile.ProfileScreen
 import site.brutt.betterred.ui.theme.BetterRedTheme
 import site.brutt.betterred.ui.theme.isDark
@@ -68,7 +70,12 @@ fun BetterRedApp(vm: AppViewModel, onDarkTheme: (Boolean) -> Unit) {
                 val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                     uri?.let(vm::importFrom)
                 }
-                OnboardingScreen(onFinish = vm::finishOnboarding, onImport = { importLauncher.launch(arrayOf("*/*")) })
+                var scanning by rememberSaveable { mutableStateOf(false) }
+                if (scanning) ScanScreen(onCode = vm::connectPartner, onBack = { scanning = false })
+                else OnboardingScreen(
+                    onFinish = vm::finishOnboarding, onImport = { importLauncher.launch(arrayOf("*/*")) },
+                    onPartner = { scanning = true },
+                )
             }
             else -> MainScaffold(state, vm)
         }
@@ -79,6 +86,7 @@ fun BetterRedApp(vm: AppViewModel, onDarkTheme: (Boolean) -> Unit) {
 private fun MainScaffold(state: AppState, vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.CALENDAR) }
     var reading by remember { mutableStateOf<Article?>(null) }
+    var scanning by remember { mutableStateOf(false) } // partner: scanning a new code
     val snackbar = remember { SnackbarHostState() }
     val today = LocalDate.now()
 
@@ -122,11 +130,15 @@ private fun MainScaffold(state: AppState, vm: AppViewModel) {
                 modifier = modifier,
             )
             Tab.NEWS -> NewsScreen(state = state, vm = vm, onOpen = { reading = it }, modifier = modifier)
-            Tab.PARTNER -> ComingSoon(Icons.Rounded.Favorite, Words.Partner.SOON_TITLE, Words.Partner.SOON_BODY, modifier)
+            Tab.PARTNER -> PartnerScreen(state = state, vm = vm, onScanNew = { scanning = true }, modifier = modifier)
             Tab.PROFILE -> ProfileScreen(state = state, vm = vm, today = today, modifier = modifier)
         }
     }
     // The article reader sits on top, so the list underneath isn't reloaded when she comes back.
     reading?.let { ArticleScreen(it, onClose = { reading = null }) }
+    if (scanning) ScanScreen(
+        onCode = { text -> vm.connectPartner(text).also { if (it == null) scanning = false } },
+        onBack = { scanning = false },
+    )
     }
 }

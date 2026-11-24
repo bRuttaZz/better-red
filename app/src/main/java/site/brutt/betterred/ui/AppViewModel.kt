@@ -21,6 +21,14 @@ import site.brutt.betterred.domain.DayLog
 import site.brutt.betterred.domain.Flow
 import site.brutt.betterred.domain.History
 import site.brutt.betterred.domain.Mood
+import site.brutt.betterred.share.Broker
+import site.brutt.betterred.share.BrokerException
+import site.brutt.betterred.share.Share
+import site.brutt.betterred.share.ShareCode
+import site.brutt.betterred.share.ShareRole
+import site.brutt.betterred.share.ShareSync
+import site.brutt.betterred.share.ShareView
+import site.brutt.betterred.share.ShareWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -43,7 +51,12 @@ data class AppState(
     val feeds: List<Feed> = emptyList(),
     /** Links of articles she has opened (the rest get the red "New" mark). */
     val readLinks: Set<String> = emptySet(),
+    /** Partner sharing: is this phone sharing (hers), viewing (partner's), or neither. */
+    val share: ShareView = ShareView(role = null),
 ) {
+    /** The partner's phone: everything is view only. */
+    val isPartner: Boolean get() = share.role == ShareRole.PARTNER
+
     val periodDays: Set<LocalDate> get() = logs.filterValues { it.flow != null }.keys
 }
 
@@ -78,9 +91,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
     // On start: forget days older than 5 years (History.YEARS), then load everything.
-    init { write { deleteDaysBefore(History.firstDay(LocalDate.now())) } }
+    init {
+        write { deleteDaysBefore(History.firstDay(LocalDate.now())) }
+        // A sync (here or in the background) changed the database: show it.
+        viewModelScope.launch { ShareSync.changed.collect { write { } } }
+        // Catch up right away when the app opens (the background job runs every 30 minutes).
+        viewModelScope.launch {
+            val error = ShareSync.sync(app)
+            if (error == null) Widgets.updateAll(app)
+        }
+    }
 
-    private fun write(done: String? = null, block: Store.() -> Unit) {
+    /**
+     * Runs [block] on the database, then reloads. [share] = it changed something her partner sees,
+     * so (if she is sharing) a sync is scheduled.
+     */
+    private fun write(done: String? = null, share: Boolean = false, block: Store.() -> Unit) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 lock.withLock {
@@ -88,14 +114,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         store.block()
                         AppState(
                             loaded = true, logs = store.loadLogs(History.firstDay(LocalDate.now())), prefs = Prefs.from(store.loadSettings()),
-                            feeds = store.loadFeeds(), readLinks = store.loadReadLinks(),
+                            feeds = store.loadFeeds(), readLinks = store.loadReadLinks(), share = store.loadShare().view(),
                         )
                     }
                 }
             }
             result.onSuccess {
+                val roleBefore = _state.value.share.role
                 _state.value = it
                 done?.let(_messages::tryEmit)
+                val app = getApplication<Application>()
+                if (it.share.role != roleBefore) {
+                    if (it.share.role != null) ShareWorker.schedule(app) else ShareWorker.cancel(app)
+                }
+                if (share && it.share.role == ShareRole.PUBLISHER) ShareWorker.soon(app)
                 Widgets.updateAll(getApplication()) // logs, settings and read marks all show on widgets
             }
                 .onFailure { _messages.tryEmit(it.message ?: Words.Messages.SOMETHING_WRONG) }
@@ -106,22 +138,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- logging ----------
 
-    fun saveLog(log: DayLog) = write(Words.Messages.SAVED) { saveLog(log) }
+    // On the partner's phone everything is view only: these do nothing there.
+
+    fun saveLog(log: DayLog) {
+        if (_state.value.isPartner) return
+        write(Words.Messages.SAVED, share = true) { saveLog(log) }
+    }
 
     fun togglePeriod(date: LocalDate) {
+        if (_state.value.isPartner) return
         val current = log(date)
         val updated = current.copy(flow = if (current.flow == null) Flow.MEDIUM else null)
-        write(if (updated.flow != null) Words.Messages.PERIOD_LOGGED else Words.Messages.PERIOD_REMOVED) { saveLog(updated) }
+        write(if (updated.flow != null) Words.Messages.PERIOD_LOGGED else Words.Messages.PERIOD_REMOVED, share = true) { saveLog(updated) }
     }
 
     fun setMood(date: LocalDate, mood: Mood) {
+        if (_state.value.isPartner) return
         val current = log(date)
-        write { saveLog(current.copy(mood = if (current.mood == mood) null else mood)) }
+        write(share = true) { saveLog(current.copy(mood = if (current.mood == mood) null else mood)) }
     }
 
     // ---------- settings ----------
 
-    private fun put(vararg pairs: Pair<String, Any>) = write { putSettings(pairs.associate { (k, v) -> k to v.toString() }) }
+    // Name and cycle numbers are part of what a partner sees, so they count as shared changes.
+    private fun put(vararg pairs: Pair<String, Any>) = write(share = true) { putSettings(pairs.associate { (k, v) -> k to v.toString() }) }
 
     fun setName(name: String) = put(Prefs.Keys.NAME to name.trim().take(24))
     fun setTheme(mode: ThemeMode) = put(Prefs.Keys.THEME to mode.name)
@@ -170,7 +210,78 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun deleteEverything() = write(Words.Messages.ALL_DELETED) { deleteEverything() }
+    /** Deletes everything. If she was sharing, her data is first removed from the server too. */
+    fun deleteEverything() {
+        viewModelScope.launch {
+            if (_state.value.share.role == ShareRole.PUBLISHER) ShareSync.stopSharing(getApplication())
+            write(Words.Messages.ALL_DELETED) { deleteEverything() }
+        }
+    }
+
+    // ---------- partner sharing ----------
+
+    private val _pairingCode = MutableStateFlow<String?>(null)
+    /** The QR text while the pairing code is on screen (it holds the private key: never stored). */
+    val pairingCode: StateFlow<String?> = _pairingCode.asStateFlow()
+
+    private val _shareBusy = MutableStateFlow(false)
+    val shareBusy: StateFlow<Boolean> = _shareBusy.asStateFlow()
+
+    private fun busy(block: suspend () -> Unit) {
+        if (_shareBusy.value) return
+        _shareBusy.value = true
+        viewModelScope.launch { try { block() } finally { _shareBusy.value = false } }
+    }
+
+    /** Her phone: registers with the server and shows the pairing code (replacing any earlier partner). */
+    fun startSharing(serverInput: String) {
+        val app = getApplication<Application>()
+        val server = Share.normalizeServer(serverInput, ShareSync.allowLocal(app))
+        if (server == null) { _messages.tryEmit(Words.Partner.BAD_SERVER); return }
+        busy {
+            runCatching { ShareSync.startSharing(app, server) }
+                .onSuccess { _pairingCode.value = it }
+                .onFailure { _messages.tryEmit(Words.Partner.error((it as? BrokerException)?.kind ?: site.brutt.betterred.share.SyncError.SERVER)) }
+        }
+    }
+
+    fun closePairingCode() { _pairingCode.value = null }
+
+    fun syncNow() = busy {
+        val error = ShareSync.sync(getApplication())
+        _messages.tryEmit(error?.let { if (_state.value.isPartner) Words.Partner.partnerError(it, _state.value.share.partnerName.orEmpty()) else Words.Partner.error(it) } ?: Words.Partner.SYNCED)
+        if (error == null) Widgets.updateAll(getApplication())
+    }
+
+    fun stopSharing() = busy {
+        val removed = ShareSync.stopSharing(getApplication())
+        _messages.tryEmit(if (removed) Words.Partner.STOPPED else Words.Partner.STOPPED_OFFLINE)
+    }
+
+    /** Her phone: what the partner may see. Every day is sent again with the new choice. */
+    fun setShareChoice(key: String, on: Boolean) {
+        write(share = true) {
+            putSettings(mapOf(key to on.toString()))
+            loadShare().takeIf { it.role == ShareRole.PUBLISHER }?.let { saveShare(it.copy(sharedAt = Broker.now())) }
+        }
+    }
+
+    /** The partner's phone: checks and saves a scanned code. Returns an error message, or null when connected. */
+    suspend fun connectPartner(text: String): String? {
+        val app = getApplication<Application>()
+        val code = ShareCode.parse(text, ShareSync.allowLocal(app)) ?: return Words.Partner.NOT_A_CODE
+        val error = ShareSync.connect(app, code) ?: run {
+            Widgets.updateAll(app)
+            return null
+        }
+        return Words.Partner.partnerError(error, "")
+    }
+
+    /** The partner's phone: forgets her data and goes back to the welcome screen. */
+    fun disconnectPartner() = busy {
+        ShareSync.disconnect(getApplication())
+        Widgets.updateAll(getApplication())
+    }
 
     // ---------- news ("Doctor said") ----------
 

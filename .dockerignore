@@ -1,0 +1,15 @@
+# Keep the build context small, machine-specific files out, and signing keys out of images.
+.git/
+.github/
+.gradle/
+.kotlin/
+.idea/
+build/
+app/build/
+dist/
+*.iml
+local.properties
+keystore.properties
+*.jks
+*.keystore
+tools/logo/mark.json

@@ -1,6 +1,7 @@
 package site.brutt.betterred.data
 
 import site.brutt.betterred.domain.CycleSettings
+import site.brutt.betterred.share.ShareChoices
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -22,6 +23,8 @@ data class Prefs(
     /** Profile icon: "" = her initial, otherwise an emoji. */
     val avatar: String = "",
     val cycle: CycleSettings = CycleSettings(),
+    /** Partner sharing: what she shares. On a partner's phone: what she shares with them. */
+    val share: ShareChoices = ShareChoices(),
 ) {
     object Keys {
         const val NAME = "name"
@@ -35,6 +38,10 @@ data class Prefs(
         const val CYCLE_LENGTH = "cycle_length"
         const val PERIOD_LENGTH = "period_length"
         const val LUTEAL_LENGTH = "luteal_length"
+        const val SHARE_MOOD = "share_mood"
+        const val SHARE_SYMPTOMS = "share_symptoms"
+        const val SHARE_NOTES = "share_notes"
+        const val SHARE_FERTILITY = "share_fertility"
     }
 
     companion object {
@@ -55,6 +62,12 @@ data class Prefs(
                     cycleLength = int(Keys.CYCLE_LENGTH, d.cycle.cycleLength, CycleSettings.CYCLE_RANGE),
                     periodLength = int(Keys.PERIOD_LENGTH, d.cycle.periodLength, CycleSettings.PERIOD_RANGE),
                     lutealLength = int(Keys.LUTEAL_LENGTH, d.cycle.lutealLength, CycleSettings.LUTEAL_RANGE),
+                ),
+                share = ShareChoices(
+                    mood = bool(Keys.SHARE_MOOD, d.share.mood),
+                    symptoms = bool(Keys.SHARE_SYMPTOMS, d.share.symptoms),
+                    notes = bool(Keys.SHARE_NOTES, d.share.notes),
+                    fertility = bool(Keys.SHARE_FERTILITY, d.share.fertility),
                 ),
             )
         }

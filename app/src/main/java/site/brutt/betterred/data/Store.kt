@@ -6,6 +6,10 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import site.brutt.betterred.Words
 import site.brutt.betterred.domain.DayLog
+import site.brutt.betterred.share.ShareCrypto
+import site.brutt.betterred.share.ShareInfo
+import site.brutt.betterred.share.ShareRole
+import site.brutt.betterred.share.SyncError
 import site.brutt.betterred.domain.Flow
 import site.brutt.betterred.domain.Mood
 import site.brutt.betterred.domain.Sex
@@ -26,6 +30,7 @@ import java.time.LocalDate
  *              updated_at  INTEGER   Unix time in seconds of the last change
  *            New things to log go into the JSON, so they need no migration, and old rows keep working.
  *   settings (key TEXT PK, value TEXT)
+ *   device   one row: this phone's id for partner sharing, and the pairing (see ShareInfo)
  *   feed     (id INTEGER PK, url TEXT UNIQUE, title TEXT, enabled INTEGER, builtin INTEGER)   ← news sources
  *   read_item(link TEXT PK, read_at INTEGER)                                                ← articles she opened
  *
@@ -43,6 +48,7 @@ class Store(private val context: Context) {
             createDayLog(db, "day_log")
             db.execSQL("CREATE TABLE settings(key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)")
             createNewsTables(db)
+            createDevice(db)
         }
 
         private fun createNewsTables(db: SQLiteDatabase) {
@@ -64,6 +70,26 @@ class Store(private val context: Context) {
             if (oldVersion < 2) db.execSQL("ALTER TABLE day_log ADD COLUMN sex TEXT")
             if (oldVersion < 3) createNewsTables(db)
             if (oldVersion < 4) moveDayLogToJson(db)
+            if (oldVersion < 5) createDevice(db)
+        }
+
+        /** v5: partner sharing. One row, made once with a random device key. */
+        private fun createDevice(db: SQLiteDatabase) {
+            db.execSQL(
+                """CREATE TABLE device(
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    device_key TEXT NOT NULL,
+                    role TEXT,
+                    server TEXT,
+                    pair_id TEXT,
+                    secret TEXT,
+                    share_key TEXT,
+                    shared_at INTEGER NOT NULL DEFAULT 0,
+                    synced_at INTEGER NOT NULL DEFAULT 0,
+                    sync_error TEXT,
+                    partner_name TEXT)"""
+            )
+            db.insert("device", null, ContentValues().apply { put("id", 1); put("device_key", ShareCrypto.b64(ShareCrypto.randomKey())) })
         }
 
         /** v4: the separate flow/mood/symptoms/note/sex columns become one JSON `data` column. */
@@ -123,6 +149,76 @@ class Store(private val context: Context) {
     /** Deletes every logged day before [first]. Called each time the app starts (the 5-year rule). */
     fun deleteDaysBefore(first: LocalDate) {
         db.delete("day_log", "date < ?", arrayOf(first.toString()))
+    }
+
+    /** Days from [from] on, with when each was last changed (unix seconds). For partner sharing. */
+    fun loadDaysWithTimes(from: LocalDate): List<Pair<DayLog, Long>> {
+        val out = ArrayList<Pair<DayLog, Long>>()
+        db.rawQuery("SELECT date, period_day, data, updated_at FROM day_log WHERE date >= ?", arrayOf(from.toString())).use { c ->
+            while (c.moveToNext()) {
+                val date = runCatching { LocalDate.parse(c.getString(0)) }.getOrNull() ?: continue
+                out += DayJson.read(date, c.getInt(1) == 1, c.getStringOrNull(2)) to c.getLong(3)
+            }
+        }
+        return out
+    }
+
+    /** Partner phone: replaces every day with what she shared (each with its own change time). */
+    fun replaceDays(days: List<Pair<DayLog, Long>>) {
+        db.beginTransaction()
+        try {
+            db.delete("day_log", null, null)
+            for ((log, updatedAt) in days) {
+                if (log.isEmpty) continue
+                db.insert("day_log", null, dayRow(log, DayJson.write(log), updatedAt))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // ---------- partner sharing (the device row) ----------
+
+    fun loadShare(): ShareInfo {
+        db.rawQuery(
+            "SELECT device_key, role, server, pair_id, secret, share_key, shared_at, synced_at, sync_error, partner_name FROM device WHERE id = 1", null,
+        ).use { c ->
+            if (!c.moveToFirst()) {
+                val key = ShareCrypto.b64(ShareCrypto.randomKey())
+                db.insert("device", null, ContentValues().apply { put("id", 1); put("device_key", key) })
+                return ShareInfo(deviceKey = key)
+            }
+            return ShareInfo(
+                deviceKey = c.getString(0),
+                role = c.getStringOrNull(1)?.let { enumOrNull<ShareRole>(it) },
+                server = c.getStringOrNull(2),
+                pairId = c.getStringOrNull(3),
+                secret = c.getStringOrNull(4),
+                shareKey = c.getStringOrNull(5),
+                sharedAt = c.getLong(6),
+                syncedAt = c.getLong(7),
+                syncError = c.getStringOrNull(8)?.let { enumOrNull<SyncError>(it) },
+                partnerName = c.getStringOrNull(9),
+            )
+        }
+    }
+
+    fun saveShare(info: ShareInfo) {
+        val cv = ContentValues().apply {
+            put("id", 1)
+            put("device_key", info.deviceKey)
+            put("role", info.role?.name)
+            put("server", info.server)
+            put("pair_id", info.pairId)
+            put("secret", info.secret)
+            put("share_key", info.shareKey)
+            put("shared_at", info.sharedAt)
+            put("synced_at", info.syncedAt)
+            put("sync_error", info.syncError?.name)
+            put("partner_name", info.partnerName)
+        }
+        db.insertWithOnConflict("device", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     /** Saves the day, or deletes it if nothing is left on it. */
@@ -203,6 +299,7 @@ class Store(private val context: Context) {
     // ---------- whole database ----------
 
     fun deleteEverything() {
+        db.delete("device", null, null) // forgets any pairing; a new device key is made on next use
         db.delete("day_log", null, null)
         db.delete("settings", null, null)
         db.delete("read_item", null, null)
@@ -255,7 +352,7 @@ class Store(private val context: Context) {
          * Bump only when a table or column changes (and add a step to onUpgrade).
          * New things logged per day go into the JSON instead and don't need a new version.
          */
-        const val DB_VERSION = 4
+        const val DB_VERSION = 5
 
         private fun createDayLog(db: SQLiteDatabase, table: String) {
             db.execSQL(

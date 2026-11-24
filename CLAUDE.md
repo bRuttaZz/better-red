@@ -12,8 +12,9 @@ The owner is new to Android development: explain Android Studio steps plainly wh
 ## Philosophy (decided with the owner; keep to it)
 
 1. **Strictly serverless, no login.** No backend that processes or stores data, no accounts.
-   Everything lives on the phone. The only network use is fetching RSS feeds and, later,
-   partner sync over public relays (see Future plan).
+   Everything lives on the phone. The only network use is fetching RSS feeds and partner sharing,
+   which goes through a small relay (the broker) that stores only end-to-end encrypted blobs it
+   can't read. Both apps keep working if the broker is down; only the partner's view pauses.
 2. **Dead simple.** Do the basics well: period calendar, next period, ovulation and fertile window,
    mood, symptoms, a short note. Say no to "super duper" features. When unsure, leave it out and ask.
 3. **Women-first.** The app speaks to her, warmly. The home card leads with a daily wish for her
@@ -30,9 +31,10 @@ The owner is new to Android development: explain Android Studio steps plainly wh
 7. **Modern, native Android look.** Material 3, her accent color (pastel red default; Leaf green,
    Sunflower yellow, or Wallpaper/dynamic on Android 12+), light/dark/system theme. Widgets follow
    the same colors and dark mode.
-8. **Minimal libraries.** AndroidX/Compose/Material plus **jsoup** (MIT) only. No image, network,
-   database, JSON or widget libraries: use what Android has (SQLiteOpenHelper, HttpURLConnection,
-   org.json, RemoteViews). Any new dependency must be GPL-3-compatible and listed in
+8. **Minimal libraries.** AndroidX/Compose/Material (incl. WorkManager and CameraX for partner
+   sharing), **jsoup** (MIT) and **ZXing core** (Apache 2.0, QR codes) only. No image, network,
+   database, JSON, crypto or widget libraries: use what Android has (SQLiteOpenHelper,
+   HttpURLConnection, org.json, java.security/javax.crypto, RemoteViews). Any new dependency must be GPL-3-compatible and listed in
    `THIRD_PARTY_NOTICES.md` and the licenses dialog (`Words.Profile.OSS_TEXT`). Ask before adding one.
 9. **All wording in one file.** Every string the app shows is in
    `app/src/main/java/site/brutt/betterred/Words.kt` (plain `const val`s, small `fun`s when
@@ -72,6 +74,8 @@ day_log   date TEXT PK ('YYYY-MM-DD')  period_day INTEGER 0/1  data TEXT (JSON) 
 settings  key TEXT PK, value TEXT                       (Prefs.kt reads these)
 feed      id, url UNIQUE, title, enabled, builtin       (news sources)
 read_item link PK, read_at                              (articles she opened; pruned after a year)
+device    one row (id = 1): device_key, role, server, pair_id, secret, share_key,
+          shared_at, synced_at, sync_error, partner_name   (partner sharing, v5; see share/ShareSync.kt)
 ```
 
 `day_log.data` today:
@@ -104,6 +108,9 @@ Rules:
   `BetterRedApp.kt` (tabs), `calendar/` (CalendarScreen, LogSheet = the "Bloody note" sheet),
   `news/`, `profile/` (incl. About → Credits), `onboarding/`, `theme/`, `brand/` (logo), `MoodIcons.kt`, `Avatar.kt`,
   `Links.kt` (open a link in the browser)
+- `share/` — partner sharing: `ShareCrypto` (keys, codes, encryption; pure JVM), `Share` (constants,
+  QR format, settings blob, what's shared), `Broker` (HTTP client), `ShareSync` (push / pull /
+  pair / stop), `ShareWorker` (WorkManager), `Qr` (ZXing). UI in `ui/partner/` (PartnerScreen, ScanScreen)
 - `widget/` — `Widgets.kt` (draws both widgets, `Palette`), `CycleWidget`, `NewsWidget`, `NewsWidgetService`
 - `tools/logo/` — scripts that trace and generate the logo vectors
 
@@ -120,9 +127,19 @@ JAVA_HOME=$(ls -d /var/lib/flatpak/app/com.google.AndroidStudio/x86_64/stable/*/
   testDebugUnitTest assembleDebug
 ```
 
-- Unit tests: `app/src/test/` (CycleCalculator, DayJson, Rss, ReadMode). Run them after every change.
-  `org.json` is a test-only dependency (Android ships its own).
+- Unit tests: `app/src/test/` (CycleCalculator, DayJson, Rss, ReadMode, ShareCrypto). Run them after
+  every change. `org.json` is a test-only dependency (Android ships its own).
+- `BrokerIntegrationTest` runs the whole sharing protocol against a live broker, only when
+  `BR_TEST_BROKER=localhost:<port>` is set (start one from `../better-red-broker` with `go run .`).
+- Debug builds accept `localhost:<port>` / `10.0.2.2:<port>` as the sharing server over plain http
+  (`app/src/debug/res/xml/network_security_config.xml`); use `adb reverse tcp:8080 tcp:8080`.
 - APK: `app/build/outputs/apk/debug/app-debug.apk`; install with `adb install -r …`.
+- **Releases** (docs/releasing.md): `Dockerfile` builds the signed release APK (JDK 21 + pinned
+  Android SDK; keys only as build secrets), `make apk` runs it, and pushing a `v*` tag runs
+  `.github/workflows/release.yml` (tag must be `v` + `versionName`) → GitHub release with the APK.
+  Release signing comes from `BR_KEYSTORE_*` env vars or a git-ignored `keystore.properties`;
+  without them the release APK is unsigned. When `compileSdk`/AGP change, update the Dockerfile's
+  SDK `ARG`s.
 - The owner's Pixel may be connected over wireless adb. It holds **real data**: before installing a
   build that changes the database, back it up first:
   `adb exec-out run-as site.brutt.betterRed cat databases/better_red.db > ../backups/<name>.db`
@@ -134,18 +151,39 @@ JAVA_HOME=$(ls -d /var/lib/flatpak/app/com.google.AndroidStudio/x86_64/stable/*/
   **don't commit or push** unless asked.
 - Never commit signing keys (`*.jks`, `*.keystore`, `keystore.properties`) or `local.properties`.
 
+## Partner sharing (built; details in docs/partner-sharing.md)
+
+Decided with the owner, keep to it:
+
+- **The broker is dumb and disposable**: `../better-red-broker` (Go + SQLite, own git repo and
+  `docs/`). One table. Minting a pair id stores nothing; the row appears on her first write; if the
+  server loses everything, her phone's next sync refills it (only the server's signing key matters).
+- **Default server** `better-red.brutt.site`, pre-filled and editable; **domain only**, the app adds
+  `https://` and the paths. Its landing page uses the app's light pastel-red theme (light only, no scripts).
+- **Device id**: every phone has a random device key (`device` table). The pair id is
+  `<device-id = hash(device key)>.<salted server signature>`, self-validating, sent in a header.
+  Her phone proves it's hers by sending the device key (never stored by the broker).
+- **Pairing**: mint a pair id (this deletes her old `device-id.*` pairs; the UI warns first), make a
+  pair secret and a P-256 key pair, keep the **public** key, and show the QR once:
+  `BR1|domain|pair id|private key|secret`. The partner scans it (camera or a screenshot).
+- **Auth**: her writes carry the device key and the pair secret (stored as sent); the partner reads
+  with a TOTP (HMAC-SHA256, 30 s, 8 digits) made from the secret. The partner can never write.
+- **Data**: only the last **60 days** (`Share.MAX_DAYS`) + a settings blob `"0"` (name, her calculated
+  cycle numbers, share choices). Each blob compressed, padded, encrypted (ECDH + HKDF + AES-GCM, pair
+  id and day as associated data). Every day of the window is sent so the broker can't tell period
+  days apart. Sex is never shared.
+- **Sync**: her phone after every change, on app open and every 30 min (WorkManager); the partner on
+  app open, "Sync now" and every 30 min. Nothing on the server = the partner shows "waiting for her
+  phone" (calm, not an error). The broker deletes pairs unused for 10 days and days older than 60.
+- **Partner's phone is view-only everywhere**; home card "How to support her today". Disconnect wipes
+  it back to the welcome screen; "Scan a new code" re-pairs.
+- **Stop sharing** deletes her data from the broker and forgets the pairing.
+
 ## Future plan (agreed, not built yet)
 
-1. **Partner mode** (the "Partner" tab is a placeholder):
-   - Pair by scanning each other's QR codes (exchange public keys; local key pairs, no accounts).
-   - The partner is **view-only**. She chooses what's shared: period dates always; mood, fertility
-     (off by default), symptoms, notes optional.
-   - Transport stays serverless: an encrypted snapshot published as a retained MQTT message on
-     public brokers (two for redundancy); Nostr relays as the alternative.
-   - The partner's home card shows "How to support Better today" (`Words.Day.SUPPORT_*`) instead of a wish.
-   - Onboarding already asks "For me / For my partner" (partner = coming soon).
+1. **Partner sharing, later:** reminders to the partner, maybe a second broker for redundancy.
 2. **Reminders:** period coming (2 days before), daily mood check-in, optional fertile-window reminder.
 3. **Small ideas:** red dot on the "Doctor said" tab when there are unread posts; a discreet/privacy
    option for the cycle widget; final logo polish.
-4. **Publishing:** release signing key (never committed), privacy policy ("data stays on the phone"),
+4. **Publishing:** create the release signing key and GitHub secrets (docs/releasing.md), privacy policy ("data stays on the phone"),
    Play Store listing; maybe F-Droid since it's GPL.

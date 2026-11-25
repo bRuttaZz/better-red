@@ -16,11 +16,11 @@ APK Download: [![Release](https://img.shields.io/github/release/bruttazz/better-
 
 | ⚡ Energy | 💧 Water | 🧠 Tokens processed | 💬 Sessions | 🔁 Model calls |
 |:-:|:-:|:-:|:-:|:-:|
-| **~5.2 kWh** | **~18 L** | 215.8 M | 5 | 660 |
+| **~5.3 kWh** | **~19 L** | 224.2 M | 5 | 678 |
 
-For reference: that's about the electricity a 1.5-ton AC uses in ~3.4 hours, and ~37 half-litre bottles of water.
+For reference: that's about the electricity a 1.5-ton AC uses in ~3.6 hours, and ~38 half-litre bottles of water.
 
-<sub>Model: Opus 5.5 (high). Estimated from Claude Code session logs (could be ~3× lower or higher); water includes on-site cooling (~2.2 L) and generating the electricity. Updated automatically, last on 2026-11-26. [How it's calculated](.claude/footprint/footprint.py).</sub>
+<sub>Model: Opus 5.5 (high). Estimated from Claude Code session logs (could be ~3× lower or higher); water includes on-site cooling (~2.3 L) and generating the electricity. Updated automatically, last on 2026-11-26. [How it's calculated](.claude/footprint/footprint.py).</sub>
 <!-- ai-footprint:end -->
 
 ---

@@ -24,6 +24,7 @@ enum class ShareRole {
 data class ShareInfo(
     val deviceKey: String,
     val role: ShareRole? = null,
+    /** The broker, stored as [Server.encode] ("domain" or "<password>@domain"). */
     val server: String? = null,
     val pairId: String? = null,
     /** The pair secret, on both phones (it's in the QR code). The partner's one-time codes come from it. (base64url) */
@@ -39,16 +40,24 @@ data class ShareInfo(
 ) {
     val paired: Boolean get() = role != null && server != null && pairId != null && secret != null && shareKey != null
 
+    /** The broker to talk to. Stored values were checked when entered, so local test servers pass. */
+    fun broker(): Server = server?.let { Server.decode(it, allowLocal = true) }
+        ?: throw BrokerException(SyncError.INVALID, "no usable server")
+
     fun view(): ShareView {
         if (!paired) return ShareView(role = null)
-        return ShareView(role, server, syncedAt, syncError, partnerName, ShareCrypto.fingerprint(pairId!!, ShareCrypto.unb64(secret!!)))
+        val s = server?.let { Server.decode(it, allowLocal = true) }
+        return ShareView(role, s?.host ?: server, s?.password != null, syncedAt, syncError, partnerName,
+            ShareCrypto.fingerprint(pairId!!, ShareCrypto.unb64(secret!!)))
     }
 }
 
 /** What the screens may know about sharing (no keys). */
 data class ShareView(
     val role: ShareRole?,
+    /** The broker's domain only, never its password. */
     val server: String? = null,
+    val serverHasPassword: Boolean = false,
     val syncedAt: Long = 0,
     val error: SyncError? = null,
     val partnerName: String? = null,
@@ -109,15 +118,17 @@ object ShareSync {
      * Pairs a new partner: asks the broker to mint a pair id for this phone (which also removes any
      * earlier pairing of it), makes a new pair secret and key pair, keeps the public key, and
      * returns the QR text: server, pair id, private key and secret.
+     * [newServer] null: keep the server (and password) she's sharing through now.
      */
-    suspend fun startSharing(context: Context, server: String): String = withStore(context) { store ->
+    suspend fun startSharing(context: Context, newServer: Server?): String = withStore(context) { store ->
         val info = store.loadShare()
+        val server = newServer ?: info.broker()
         val minted = Broker(server).mint(ShareCrypto.unb64(info.deviceKey))
         val secret = ShareCrypto.randomKey()
         val (publicKey, privateKey) = ShareCrypto.newKeyPair()
         store.saveShare(
             ShareInfo(
-                deviceKey = info.deviceKey, role = ShareRole.PUBLISHER, server = server, pairId = minted.pairId,
+                deviceKey = info.deviceKey, role = ShareRole.PUBLISHER, server = server.encode(), pairId = minted.pairId,
                 secret = ShareCrypto.b64(secret), shareKey = ShareCrypto.b64(publicKey), sharedAt = Broker.now(),
             )
         )
@@ -132,7 +143,7 @@ object ShareSync {
     suspend fun stopSharing(context: Context): Boolean = withStore(context) { store ->
         val info = store.loadShare()
         val removed = if (info.paired && info.role == ShareRole.PUBLISHER) {
-            runCatching { Broker(info.server!!).delete(info.pairId!!, ShareCrypto.unb64(info.deviceKey)) }
+            runCatching { Broker(info.broker()).delete(info.pairId!!, ShareCrypto.unb64(info.deviceKey)) }
                 .fold(onSuccess = { true }, onFailure = { (it as? BrokerException)?.kind == SyncError.INVALID })
         } else true
         store.saveShare(ShareInfo(deviceKey = info.deviceKey))
@@ -146,10 +157,10 @@ object ShareSync {
     }
 
     private fun partnerCode(info: ShareInfo) =
-        ShareCode(info.server!!, info.pairId!!, ShareCrypto.unb64(info.shareKey!!), ShareCrypto.unb64(info.secret!!))
+        ShareCode(info.broker(), info.pairId!!, ShareCrypto.unb64(info.shareKey!!), ShareCrypto.unb64(info.secret!!))
 
     private fun push(store: Store, info: ShareInfo) {
-        val broker = Broker(info.server!!)
+        val broker = Broker(info.broker())
         val pairId = info.pairId!!
         val deviceKey = ShareCrypto.unb64(info.deviceKey)
         val publicKey = ShareCrypto.unb64(info.shareKey!!)
@@ -195,7 +206,7 @@ object ShareSync {
      */
     suspend fun connect(context: Context, code: ShareCode): SyncError? = withStore(context) { store ->
         val info = store.loadShare().copy(
-            role = ShareRole.PARTNER, server = code.server, pairId = code.pairId,
+            role = ShareRole.PARTNER, server = code.server.encode(), pairId = code.pairId,
             secret = ShareCrypto.b64(code.secret), shareKey = ShareCrypto.b64(code.privateKey),
             syncError = null, sharedAt = 0, partnerName = null,
         )

@@ -13,6 +13,7 @@ import site.brutt.betterred.domain.Sex
 import site.brutt.betterred.domain.Symptom
 import site.brutt.betterred.share.Share
 import site.brutt.betterred.share.ShareChoices
+import site.brutt.betterred.share.Server
 import site.brutt.betterred.share.ShareCode
 import site.brutt.betterred.share.ShareConfig
 import site.brutt.betterred.share.ShareCrypto
@@ -78,7 +79,7 @@ class ShareCryptoTest {
     }
 
     @Test fun shareCodeRoundTripAndRejectsJunk() {
-        val code = ShareCode("better-red.brutt.site", "A".repeat(22) + "." + "B".repeat(32), ByteArray(32) { 1 }, ByteArray(32) { 2 })
+        val code = ShareCode(Server("better-red.brutt.site"), "A".repeat(22) + "." + "B".repeat(32), ByteArray(32) { 1 }, ByteArray(32) { 2 })
         val text = code.encode()
         assertTrue("fits a QR code comfortably: ${text.length}", text.length < 200)
         assertEquals(code, ShareCode.parse(text))
@@ -86,8 +87,35 @@ class ShareCryptoTest {
         assertNull(ShareCode.parse(text.replace("BR1", "BR9")))
         assertNull(ShareCode.parse(text.replace("better-red.brutt.site", "evil site")))
         assertNull(ShareCode.parse(text.replace(code.pairId, "A".repeat(22) + "." + "B".repeat(22)))) // old/short pair id
-        assertNull(ShareCode.parse(ShareCode("localhost:8080", code.pairId, code.privateKey, code.secret).encode())) // only debug builds
-        assertEquals("localhost:8080", ShareCode.parse(ShareCode("localhost:8080", code.pairId, code.privateKey, code.secret).encode(), allowLocal = true)?.server)
+        val local = ShareCode(Server("localhost:8080"), code.pairId, code.privateKey, code.secret).encode()
+        assertNull(ShareCode.parse(local)) // only debug builds
+        assertEquals(Server("localhost:8080"), ShareCode.parse(local, allowLocal = true)?.server)
+    }
+
+    @Test fun shareCodeCarriesTheServerPassword() {
+        // Every awkward character a password may have, including the code's own separators.
+        val server = Server("my.server.org", "p@ss|w%rd+/:#?&=~")
+        val code = ShareCode(server, "A".repeat(22) + "." + "B".repeat(32), ByteArray(32) { 1 }, ByteArray(32) { 2 })
+        val text = code.encode()
+        assertEquals(5, text.split('|').size)
+        assertEquals(server, ShareCode.parse(text)?.server)
+        assertTrue("the password is never part of toString", "p@ss" !in server.toString())
+    }
+
+    @Test fun serverWithOptionalPassword() {
+        assertEquals(Server("better-red.brutt.site"), Server.parse("better-red.brutt.site"))
+        assertEquals(Server("my.server.org", "Secret123"), Server.parse(" https://Secret123@My.Server.org/ "))
+        assertEquals(Server("my.server.org", "a@b@c"), Server.parse("a@b@c@my.server.org")) // the last "@" splits
+        assertEquals(Server("localhost:8080", "pw"), Server.parse("pw@localhost:8080", allowLocal = true))
+        for (bad in listOf("@my.server.org", "with space@my.server.org", "pässword@my.server.org", "pw@", "pw@not a host",
+            "x".repeat(129) + "@my.server.org", "pw@localhost:8080")) {
+            assertNull(bad, Server.parse(bad))
+        }
+        for (s in listOf(Server("a.org"), Server("a.org", "Secret123"), Server("a.org", "p@ss|w%rd+ ".trim()))) {
+            assertEquals(s, Server.decode(s.encode()))
+        }
+        assertEquals("a.org", Server("a.org").encode())
+        assertEquals("Secret123@a.org", Server("a.org", "Secret123").encode())
     }
 
     @Test fun serverAddressesAreDomainsOnly() {

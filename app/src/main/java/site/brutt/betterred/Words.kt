@@ -280,8 +280,11 @@ object Words {
         const val B_CONTROL_SUB = "You decide what’s shared, and you can stop at any time."
         const val SERVER = "Server"
         const val CHANGE = "Change"
-        const val SERVER_HINT = "Domain only, like better-red.brutt.site"
-        const val BAD_SERVER = "That doesn’t look like a server address (a domain like better-red.brutt.site)."
+        const val SERVER_HINT = "A domain, like better-red.brutt.site. Your own server with a password: password@your.domain"
+        const val BAD_SERVER = "That doesn’t look like a server address: a domain like better-red.brutt.site, or password@your.domain for a server with a password."
+        /** The server as shown on screen: never its password. */
+        fun serverLabel(host: String, hasPassword: Boolean) = if (hasPassword) "$host · with password" else host
+        const val PASSWORD_START = "The server refused the password, or it needs one. Type the server as password@your.domain."
         const val START = "Show pairing code"
         const val STARTING = "Getting a code…"
 
@@ -370,6 +373,7 @@ object Words {
             SyncError.CLOCK -> "The server refused the sign-in code. Check that the phone’s date and time are set automatically."
             SyncError.SERVER -> "The server had a problem. It will try again later."
             SyncError.DATA -> "Something couldn’t be prepared for sharing. It will try again later."
+            SyncError.PASSWORD -> "The server refused its password (maybe it was changed). Stop sharing and make a new pairing code with the new password."
         }
 
         /** The same problems, as seen on the partner's phone. */
@@ -377,6 +381,7 @@ object Words {
             SyncError.WAITING -> "Waiting for ${name.ifBlank { "her" }}’s phone to send updates."
             SyncError.INVALID -> "This connection isn’t accepted by the server any more. Scan a new code from her phone."
             SyncError.DATA -> "The shared data couldn’t be read. Scan a new code from her phone."
+            SyncError.PASSWORD -> "Her server’s password has changed. Scan a new code from her phone."
             else -> error(e)
         }
 

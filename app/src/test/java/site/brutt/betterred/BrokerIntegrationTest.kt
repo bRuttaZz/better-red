@@ -9,6 +9,7 @@ import site.brutt.betterred.share.Broker
 import site.brutt.betterred.share.BrokerException
 import site.brutt.betterred.share.RemoteEntry
 import site.brutt.betterred.share.ShareChoices
+import site.brutt.betterred.share.Server
 import site.brutt.betterred.share.ShareCode
 import site.brutt.betterred.share.ShareConfig
 import site.brutt.betterred.share.ShareCrypto
@@ -20,15 +21,24 @@ import java.time.LocalDate
  *
  *   cd ../better-red-broker && go run . -addr localhost:8099 -db /tmp/br/br.db -key-file /tmp/br/br.key
  *   BR_TEST_BROKER=localhost:8099 ./gradlew testDebugUnitTest
+ *
+ * For a broker started with BR_PASSWORD=…, also set BR_TEST_PASSWORD to the same value: the
+ * password check (missing and wrong passwords) is tested too.
  */
 class BrokerIntegrationTest {
-    private val server = System.getenv("BR_TEST_BROKER")
+    private val host = System.getenv("BR_TEST_BROKER")
+    private val password = System.getenv("BR_TEST_PASSWORD")?.takeIf { it.isNotBlank() }
+    private val server = host?.let { Server(it, password) }
 
     private fun kind(block: () -> Unit) = (runCatching(block).exceptionOrNull() as BrokerException).kind
 
     @Test fun publisherToPartner() {
-        assumeTrue("set BR_TEST_BROKER to run", !server.isNullOrBlank())
+        assumeTrue("set BR_TEST_BROKER to run", !host.isNullOrBlank())
         val broker = Broker(server!!)
+        if (password != null) {
+            assertEquals(SyncError.PASSWORD, kind { Broker(Server(host!!)).mint(ShareCrypto.randomKey()) })
+            assertEquals(SyncError.PASSWORD, kind { Broker(Server(host!!, "wrong-$password")).mint(ShareCrypto.randomKey()) })
+        }
 
         // Her phone: mint a pair id (nothing stored yet), make a secret and a key pair, show the QR.
         val deviceKey = ShareCrypto.randomKey()

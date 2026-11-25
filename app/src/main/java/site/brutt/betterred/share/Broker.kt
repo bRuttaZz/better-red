@@ -16,6 +16,7 @@ enum class SyncError {
     INVALID, // the server doesn't accept this pair id (e.g. another server, or its key changed): pair again
     CLOCK,   // the partner's one-time code was refused: usually a wrong clock on one of the phones
     SERVER,  // the server failed or refused the request
+    PASSWORD, // a private (self-hosted) server refused the password, or wants one
     DATA,    // what came back couldn't be read (wrong key, damaged data)
 }
 
@@ -26,14 +27,15 @@ data class RemoteEntry(val blob: String, val updatedAt: Long)
 
 /**
  * Talks to a Better Red broker (better-red-broker, the Go server). Paths are added here; the user
- * only ever enters a domain. The pair id goes in a header, never in the URL. Every call is plain
+ * only ever enters a domain (with a password for a private broker, sent on every request). The pair id goes in a header, never in the URL. Every call is plain
  * HTTPS with JSON; see docs/partner-sharing.md. Not for the main thread.
  *
  * Her phone proves a pair id is hers with its device key; the partner with a one-time code made
  * from the pair secret. The broker stores nothing but what her phone writes.
  */
-class Broker(server: String) {
-    private val base = Share.baseUrl(server)
+class Broker(server: Server) {
+    private val base = Share.baseUrl(server.host)
+    private val password = server.password
 
     data class Minted(val pairId: String, val maxDays: Int)
     data class Index(val days: Map<String, Long>, val maxDays: Int)
@@ -99,6 +101,7 @@ class Broker(server: String) {
                 useCaches = false
                 setRequestProperty("User-Agent", "BetterRed")
                 setRequestProperty("Accept", "application/json")
+                if (password != null) setRequestProperty("X-Better-Red-Password", password)
                 for ((k, v) in headers) setRequestProperty(k, v)
                 if (partner != null) {
                     setRequestProperty("X-Better-Red-Pair", partner.first)
@@ -121,6 +124,9 @@ class Broker(server: String) {
                 code in 200..299 -> if (text.isBlank()) JSONObject() else JSONObject(text)
                 code == 404 -> throw BrokerException(SyncError.WAITING, "nothing stored")
                 code == 403 -> throw BrokerException(SyncError.INVALID, "pair id refused")
+                // A private broker refusing the password: before the other 401s (no clock retry).
+                code == 401 && conn.getHeaderField("WWW-Authenticate") == "BetterRed-Password" ->
+                    throw BrokerException(SyncError.PASSWORD, "password refused")
                 // The partner's code: retry once with the clock corrected from the Date header.
                 code == 401 && partner != null && !retried -> call(method, path, headers, body, partner, retried = true)
                 code == 401 && partner != null -> throw BrokerException(SyncError.CLOCK, "code refused")

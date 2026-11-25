@@ -163,13 +163,16 @@ Decided with the owner, keep to it:
   `docs/`). One table. Minting a pair id stores nothing; the row appears on her first write; if the
   server loses everything, her phone's next sync refills it (only the server's signing key matters).
 - **Default server** `better-red.brutt.site`, pre-filled and editable; **domain only**, the app adds
-  `https://` and the paths. Its landing page uses the app's light pastel-red theme (light only, no scripts).
+  `https://` and the paths. **Optional password** for private self-hosted brokers (`BR_PASSWORD` on
+  the broker): typed as `password@domain` (connection-string style, last `@` splits, no user name),
+  `share/Share.kt` `Server`; sent as `X-Better-Red-Password` on every call; stored and put in the QR
+  URL-encoded; never shown on screen; a refusal is `SyncError.PASSWORD`. Its landing page uses the app's light pastel-red theme (light only, no scripts).
 - **Device id**: every phone has a random device key (`device` table). The pair id is
   `<device-id = hash(device key)>.<salted server signature>`, self-validating, sent in a header.
   Her phone proves it's hers by sending the device key (never stored by the broker).
 - **Pairing**: mint a pair id (this deletes her old `device-id.*` pairs; the UI warns first), make a
   pair secret and a P-256 key pair, keep the **public** key, and show the QR once:
-  `BR1|domain|pair id|private key|secret`. The partner scans it (camera or a screenshot).
+  `BR1|server|pair id|private key|secret` (server = domain or `<url-encoded password>@domain`). The partner scans it (camera or a screenshot).
 - **Auth**: her writes carry the device key and the pair secret (stored as sent); the partner reads
   with a TOTP (HMAC-SHA256, 30 s, 8 digits) made from the secret. The partner can never write.
 - **Data**: only the last **60 days** (`Share.MAX_DAYS`) + a settings blob `"0"` (name, her calculated

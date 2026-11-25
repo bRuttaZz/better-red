@@ -29,8 +29,13 @@ flowchart LR
   including the server, can read.
 - **She's in control**: switches for what's shared; "Stop sharing" deletes the server copy; "New
   pairing code" replaces the partner (with a warning first). Only the last 60 days are ever shared.
-- **Default server** `better-red.brutt.site`, already filled in; she can change it (domain only),
-  but is never asked to.
+- **Default server** `better-red.brutt.site`, already filled in; she can change it (a domain), but
+  is never asked to.
+- **Private servers** (optional): someone who self-hosts the broker with `BR_PASSWORD` types the
+  server like a connection string, `password@your.domain` (the last `@` splits them; no user name).
+  The password is sent with every request (`X-Better-Red-Password`) and travels in the QR code, so
+  the partner never types it. Screens show only the domain ("· with password"). The default server
+  has no password and nothing changes for it.
 
 ## Pairing
 
@@ -88,7 +93,8 @@ flowchart TD
 - After a sync, `ShareSync.changed` makes the app reload, and the widgets are redrawn.
 - Problems are kept in `device.sync_error` and shown on the Partner tab (`Words.Partner.error`,
   `partnerError`): offline, waiting (partner: nothing on the server yet or any more, shown as a calm
-  note), invalid (pair id or device refused: pair again), clock, server, data.
+  note), invalid (pair id or device refused: pair again), clock, server, data, password (a private
+  server refused its password: pair again with the new one).
 
 ## Unpairing and re-pairing
 
@@ -97,14 +103,15 @@ flowchart TD
   "waiting for her phone" until he scans the new code.
 - **The partner**: "Scan a new code" replaces the connection; "Disconnect" wipes everything she
   shared from his phone and goes back to the welcome screen.
-- **Server changes** (new domain): she stops sharing, sets the new server, makes a new code.
+- **Server changes** (new domain, or a private server's new password): she stops sharing, sets the
+  new server (`newpassword@domain`), makes a new code.
 
 ## Code (`app/src/main/java/site/brutt/betterred/share/`)
 
 | file | |
 |---|---|
 | `ShareCrypto.kt` | device id, TOTP codes, fingerprint, P-256 ECDH + HKDF + AES-GCM blobs, DEFLATE + padding. Pure JVM, unit-tested |
-| `Share.kt` | constants (60 days, default server, 30 min), server address rules, QR format (`ShareCode`), settings blob (`ShareConfig`), what's shared from a day (`forPartner`) |
+| `Share.kt` | constants (60 days, default server, 30 min), server address rules, `Server` (domain + optional password; typed `password@domain`, stored URL-encoded), QR format (`ShareCode`), settings blob (`ShareConfig`), what's shared from a day (`forPartner`) |
 | `Broker.kt` | HTTP client for the broker (HttpURLConnection + org.json), headers, clock-drift correction, `SyncError` |
 | `ShareSync.kt` | start / sync / stop / connect / disconnect, one at a time; `ShareInfo` (the device row), `ShareView` (what the UI may see) |
 | `ShareWorker.kt` | WorkManager jobs: every 30 min, and "soon" after a change |
@@ -114,11 +121,12 @@ flowchart TD
 
 Tests: `ShareCryptoTest` (crypto and formats; device id vector shared with the broker) and
 `BrokerIntegrationTest` (the whole protocol against a live broker, including "waiting", wrong keys,
-re-pairing and unpairing; skipped unless `BR_TEST_BROKER` is set).
+re-pairing and unpairing; skipped unless `BR_TEST_BROKER` is set; with `BR_TEST_PASSWORD` it also
+tests a private broker started with the same `BR_PASSWORD`).
 
 ## Testing on devices
 
-Debug builds accept `localhost:<port>` and `10.0.2.2:<port>` as the server, over plain http
+Debug builds accept `localhost:<port>` and `10.0.2.2:<port>` (also `password@localhost:<port>`) as the server, over plain http
 (`src/debug/res/xml/network_security_config.xml`). Release builds are HTTPS-only.
 
 ```bash

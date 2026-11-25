@@ -23,6 +23,7 @@ import site.brutt.betterred.domain.History
 import site.brutt.betterred.domain.Mood
 import site.brutt.betterred.share.Broker
 import site.brutt.betterred.share.BrokerException
+import site.brutt.betterred.share.Server
 import site.brutt.betterred.share.Share
 import site.brutt.betterred.share.ShareCode
 import site.brutt.betterred.share.ShareRole
@@ -233,16 +234,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { try { block() } finally { _shareBusy.value = false } }
     }
 
-    /** Her phone: registers with the server and shows the pairing code (replacing any earlier partner). */
+    /**
+     * Her phone: registers with the server and shows the pairing code (replacing any earlier partner).
+     * [serverInput] is what she typed: "domain", or "password@domain" for a private server.
+     */
     fun startSharing(serverInput: String) {
         val app = getApplication<Application>()
-        val server = Share.normalizeServer(serverInput, ShareSync.allowLocal(app))
+        val server = Server.parse(serverInput, ShareSync.allowLocal(app))
         if (server == null) { _messages.tryEmit(Words.Partner.BAD_SERVER); return }
-        busy {
-            runCatching { ShareSync.startSharing(app, server) }
-                .onSuccess { _pairingCode.value = it }
-                .onFailure { _messages.tryEmit(Words.Partner.error((it as? BrokerException)?.kind ?: site.brutt.betterred.share.SyncError.SERVER)) }
-        }
+        startSharing(server)
+    }
+
+    /** Her phone: a new pairing code on the same server (and password). */
+    fun newPairingCode() = startSharing(server = null)
+
+    /** [server] null: the one she's sharing through now. */
+    private fun startSharing(server: Server?) = busy {
+        runCatching { ShareSync.startSharing(getApplication(), server) }
+            .onSuccess { _pairingCode.value = it }
+            .onFailure {
+                val kind = (it as? BrokerException)?.kind ?: site.brutt.betterred.share.SyncError.SERVER
+                _messages.tryEmit(if (kind == site.brutt.betterred.share.SyncError.PASSWORD) Words.Partner.PASSWORD_START else Words.Partner.error(kind))
+            }
     }
 
     fun closePairingCode() { _pairingCode.value = null }

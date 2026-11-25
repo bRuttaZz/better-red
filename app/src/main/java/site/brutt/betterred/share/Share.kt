@@ -3,6 +3,8 @@ package site.brutt.betterred.share
 import org.json.JSONObject
 import site.brutt.betterred.data.DayJson
 import site.brutt.betterred.domain.DayLog
+import java.net.URLDecoder
+import java.net.URLEncoder
 import java.time.LocalDate
 
 /** Partner sharing: fixed values, the QR code format, and what goes inside the encrypted blobs. */
@@ -38,6 +40,45 @@ object Share {
     fun isLocal(server: String) = LOCAL.matches(server)
 }
 
+/**
+ * A broker: its domain (and port), plus a password if it's a private, self-hosted one (started
+ * with BR_PASSWORD). She types it like a connection string, "password@domain"; the default server
+ * has no password. The password goes along with every request (X-Better-Red-Password) and is in
+ * the pairing code, because the partner's phone needs it too. Never shown on screen.
+ */
+data class Server(val host: String, val password: String? = null) {
+    /** Stored form (device table, QR code): "domain" or "<password, URL-encoded>@domain". */
+    fun encode(): String = password?.let { "${URLEncoder.encode(it, "UTF-8")}@$host" } ?: host
+
+    override fun toString() = host // never the password (logs, screens)
+
+    companion object {
+        private val PASSWORD = Regex("""^[\x21-\x7E]{1,128}$""") // printable ASCII, no spaces (same rule as the broker)
+
+        fun validPassword(p: String) = PASSWORD.matches(p)
+
+        /** What she typed: "domain" or "password@domain" (the last "@" splits them). Null when invalid. */
+        fun parse(input: String, allowLocal: Boolean = false): Server? {
+            var s = input.trim()
+            for (scheme in listOf("https://", "http://")) if (s.startsWith(scheme, ignoreCase = true)) s = s.substring(scheme.length)
+            val at = s.lastIndexOf('@')
+            val host = Share.normalizeServer(if (at >= 0) s.substring(at + 1) else s, allowLocal) ?: return null
+            if (at < 0) return Server(host)
+            val password = s.substring(0, at)
+            return if (validPassword(password)) Server(host, password) else null
+        }
+
+        /** The stored form ([encode]). Null when invalid. */
+        fun decode(stored: String, allowLocal: Boolean = false): Server? {
+            val at = stored.lastIndexOf('@')
+            val host = Share.normalizeServer(if (at >= 0) stored.substring(at + 1) else stored, allowLocal) ?: return null
+            if (at < 0) return Server(host)
+            val password = runCatching { URLDecoder.decode(stored.substring(0, at), "UTF-8") }.getOrNull() ?: return null
+            return if (validPassword(password)) Server(host, password) else null
+        }
+    }
+}
+
 /** What she lets her partner see. Period dates are always shared; sex is never shared. */
 data class ShareChoices(
     val mood: Boolean = true,
@@ -47,17 +88,19 @@ data class ShareChoices(
 )
 
 /**
- * What the QR code holds: "BR1|<server>|<pair id>|<private key>|<pair secret>" (keys base64url).
+ * What the QR code holds: "BR1|<server>|<pair id>|<private key>|<pair secret>" (keys base64url;
+ * server as in [Server.encode], so "<password>@domain" for a private broker; older app versions
+ * refuse such codes instead of failing later).
  * Whoever scans it can read what she shares, so it is shown only on her screen, once.
  */
-data class ShareCode(val server: String, val pairId: String, val privateKey: ByteArray, val secret: ByteArray) {
-    fun encode(): String = listOf("BR1", server, pairId, ShareCrypto.b64(privateKey), ShareCrypto.b64(secret)).joinToString("|")
+data class ShareCode(val server: Server, val pairId: String, val privateKey: ByteArray, val secret: ByteArray) {
+    fun encode(): String = listOf("BR1", server.encode(), pairId, ShareCrypto.b64(privateKey), ShareCrypto.b64(secret)).joinToString("|")
 
     companion object {
         fun parse(text: String, allowLocal: Boolean = false): ShareCode? {
             val parts = text.trim().split('|')
             if (parts.size != 5 || parts[0] != "BR1") return null
-            val server = Share.normalizeServer(parts[1], allowLocal) ?: return null
+            val server = Server.decode(parts[1], allowLocal) ?: return null
             if (!Regex("""^[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{32}$""").matches(parts[2])) return null
             val priv = runCatching { ShareCrypto.unb64(parts[3]) }.getOrNull()?.takeIf { it.size == 32 } ?: return null
             val secret = runCatching { ShareCrypto.unb64(parts[4]) }.getOrNull()?.takeIf { it.size == 32 } ?: return null

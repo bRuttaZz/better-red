@@ -77,6 +77,7 @@ import kotlinx.coroutines.delay
 import site.brutt.betterred.Words
 import site.brutt.betterred.data.Prefs
 import site.brutt.betterred.share.Qr
+import site.brutt.betterred.share.Server
 import site.brutt.betterred.share.Share
 import site.brutt.betterred.share.ShareRole
 import site.brutt.betterred.share.SyncError
@@ -142,7 +143,8 @@ private fun NotSharing(busy: Boolean, onStart: (String) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Rounded.Dns, null, Modifier.size(18.dp), tint = cs.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
-            Text("${Words.Partner.SERVER}: $server", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
+            val shown = Server.parse(server, allowLocal = true)?.let { Words.Partner.serverLabel(it.host, it.password != null) } ?: server
+            Text("${Words.Partner.SERVER}: $shown", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, modifier = Modifier.weight(1f))
             TextButton(onClick = { editing = true }) { Text(Words.Partner.CHANGE) }
         }
     }
@@ -200,14 +202,14 @@ private fun Sharing(state: AppState, busy: Boolean, now: Long, vm: AppViewModel)
     Section(Words.Partner.SECTION_SYNC)
     Group {
         InfoRow(Icons.Rounded.Lock, Words.Partner.ENCRYPTED, Words.Partner.fingerprint(share.fingerprint))
-        InfoRow(Icons.Rounded.Dns, Words.Partner.SERVER, share.server.orEmpty())
+        InfoRow(Icons.Rounded.Dns, Words.Partner.SERVER, Words.Partner.serverLabel(share.server.orEmpty(), share.serverHasPassword))
         ActionRow(Icons.Rounded.Sync, Words.Partner.SYNC_NOW, if (share.syncedAt > 0) Words.Partner.ago(share.syncedAt, now) else "", enabled = !busy, onClick = vm::syncNow)
         ActionRow(Icons.Rounded.QrCode2, Words.Partner.NEW_CODE, Words.Partner.NEW_CODE_SUB, enabled = !busy) { confirmNew = true }
         ActionRow(Icons.Rounded.LinkOff, Words.Partner.STOP, Words.Partner.STOP_SUB, enabled = !busy, danger = true) { confirmStop = true }
     }
 
     if (confirmNew) Confirm(Words.Partner.NEW_CODE_TITLE, Words.Partner.NEW_CODE_BODY, Words.Partner.NEW_CODE_CONFIRM, danger = false,
-        onDismiss = { confirmNew = false }) { confirmNew = false; vm.startSharing(share.server ?: Share.DEFAULT_SERVER) }
+        onDismiss = { confirmNew = false }) { confirmNew = false; vm.newPairingCode() }
     if (confirmStop) Confirm(Words.Partner.STOP_TITLE, Words.Partner.STOP_BODY, Words.Partner.STOP_CONFIRM, danger = true,
         onDismiss = { confirmStop = false }) { confirmStop = false; vm.stopSharing() }
 }
@@ -243,7 +245,7 @@ private fun Viewing(state: AppState, busy: Boolean, now: Long, vm: AppViewModel,
     Section(Words.Partner.SECTION_SYNC)
     Group {
         InfoRow(Icons.Rounded.Lock, Words.Partner.ENCRYPTED, Words.Partner.fingerprint(share.fingerprint))
-        InfoRow(Icons.Rounded.Dns, Words.Partner.SERVER, share.server.orEmpty())
+        InfoRow(Icons.Rounded.Dns, Words.Partner.SERVER, Words.Partner.serverLabel(share.server.orEmpty(), share.serverHasPassword))
         ActionRow(Icons.Rounded.Sync, Words.Partner.SYNC_NOW, if (share.syncedAt > 0) Words.Partner.ago(share.syncedAt, now) else "", enabled = !busy, onClick = vm::syncNow)
         ActionRow(Icons.Rounded.QrCodeScanner, Words.Partner.SCAN_NEW, Words.Partner.SCAN_NEW_SUB, enabled = !busy, onClick = onScanNew)
         ActionRow(Icons.Rounded.LinkOff, Words.Partner.DISCONNECT, Words.Partner.DISCONNECT_SUB, enabled = !busy, danger = true) { confirmDisconnect = true }

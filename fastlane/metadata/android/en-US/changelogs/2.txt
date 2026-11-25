@@ -1,0 +1,1 @@
+Private servers: type password@your.domain to use a self-hosted relay with a password.

@@ -24,6 +24,7 @@ read it. Pair in person with a QR code; only the last 60 days are ever shared. S
 ## Download and build
 
 Signed APKs are on the [releases page](https://github.com/bRuttaZz/better-red/releases) (Android 10+).
+F-Droid: see [docs/fdroid.md](docs/fdroid.md) (store texts and screenshots are in `fastlane/`).
 Pushing a `v*` tag builds and publishes one automatically. To build it yourself you only need
 podman or docker:
 

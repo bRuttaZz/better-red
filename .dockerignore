@@ -13,3 +13,6 @@ keystore.properties
 *.jks
 *.keystore
 tools/logo/mark.json
+
+# Store texts and screenshots (F-Droid reads them from the repo; not needed to build)
+fastlane/

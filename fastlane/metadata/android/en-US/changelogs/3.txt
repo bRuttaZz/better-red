@@ -1,0 +1,2 @@
+Partner sharing can use your own self-hosted server, optionally protected with a password (password@your.domain).
+Build fixes for F-Droid.

@@ -42,7 +42,9 @@ Then add the repository secrets on GitHub → Settings → Secrets and variables
    only in release): `make apk KEYSTORE=…`, install `dist/*.apk` on the emulator, and try start-up,
    onboarding, logging a day, a restart, the news tab and pairing.
 1. In `app/build.gradle.kts`: set `versionName` (what people see, e.g. `"1.1.0"`) and **raise
-   `versionCode` by 1** (Android refuses an update whose code isn't higher).
+   `versionCode` by 1** (Android refuses an update whose code isn't higher). Add
+   `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (shown on F-Droid; see
+   docs/fdroid.md).
 2. Commit, then tag and push:
 
    ```bash

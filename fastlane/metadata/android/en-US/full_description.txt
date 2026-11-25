@@ -1,0 +1,22 @@
+Better Red is a simple, private period tracker. There is no account and no cloud: everything you log stays in one file on your phone, and you can export or import it whenever you like.
+
+<b>What it does</b>
+<ul>
+<li>Period calendar with your next period, ovulation and fertile window, predicted from your own logged cycles and adjusting as you log more</li>
+<li>Log flow, mood, symptoms and a short note for any day</li>
+<li>A warm daily message for your cycle phase; fertility details can be hidden</li>
+<li>Home screen widgets for your cycle day and the latest articles, in light and dark</li>
+<li>"…and the doctor said": articles from women's health non-profits, with a built-in reader view; add up to three feeds of your own</li>
+<li>Pastel red, leaf green, sunflower yellow or wallpaper colors; light, dark or system theme</li>
+<li>Keeps the last 5 years of data</li>
+</ul>
+
+<b>Optional partner sharing</b>
+Your partner can see what you choose to share (period dates, and if you like mood, fertility, symptoms or notes), view only. Pair in person with a QR code; no accounts or emails. Data is end-to-end encrypted on your phone and passes through a small relay that can't read it. Only the last 60 days are ever shared, and you can stop at any time. The default relay is better-red.brutt.site; the relay is free software too, and you can host your own (optionally with a password).
+
+<b>Privacy</b>
+No ads, no analytics, no trackers, no account. The app only goes online to fetch the article feeds and, if you turn it on, for partner sharing.
+
+Predictions are estimates, not medical advice and not birth control.
+
+Free software under the GNU GPL v3.

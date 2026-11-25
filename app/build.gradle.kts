@@ -27,8 +27,8 @@ android {
         targetSdk = 37
         // The one place to change the version. versionName is what people see ("1.0.0");
         // versionCode must go up by 1 for every release you install over an older one.
-        versionCode = 2
-        versionName = "1.2.0"
+        versionCode = 3
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -61,6 +61,11 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    // No Google-signed dependency list inside the APK: F-Droid refuses it, and it isn't needed.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 

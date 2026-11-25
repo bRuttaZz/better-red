@@ -140,6 +140,10 @@ JAVA_HOME=$(ls -d /var/lib/flatpak/app/com.google.AndroidStudio/x86_64/stable/*/
   Release signing comes from `BR_KEYSTORE_*` env vars or a git-ignored `keystore.properties`;
   without them the release APK is unsigned. When `compileSdk`/AGP change, update the Dockerfile's
   SDK `ARG`s.
+- **F-Droid** (docs/fdroid.md): store texts, icon, feature graphic and screenshots live in
+  `fastlane/metadata/android/en-US/`; every release needs `changelogs/<versionCode>.txt`. Keep
+  `dependenciesInfo` off and the release build unsigned without a key (F-Droid signs). Screenshots
+  use made-up data on the emulator, never her real data.
 - **Release builds use R8** (whole app; never narrow `optimization.packageScope`: that crashed at
   start). Keep rules for reflection go in `app/src/main/keepRules/rules.keep` (one for Room/WorkManager
   is there). Debug builds don't run R8, so **test a release APK on the emulator before tagging**:

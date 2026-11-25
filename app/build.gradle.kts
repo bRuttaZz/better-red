@@ -27,8 +27,8 @@ android {
         targetSdk = 37
         // The one place to change the version. versionName is what people see ("1.0.0");
         // versionCode must go up by 1 for every release you install over an older one.
-        versionCode = 3
-        versionName = "1.2.1"
+        versionCode = 4
+        versionName = "1.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -47,6 +47,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release")
+            // No git details inside the APK: they differ between our Docker build (no .git) and
+            // F-Droid's (a git clone), which would stop F-Droid reproducing our signed APK.
+            vcsInfo {
+                include = false
+            }
             // R8 shrinks and optimizes the whole app (default scope "**"). Don't limit packageScope to
             // some packages: half-optimized code crashed at start (IllegalAccessError). Extra keep
             // rules live in src/main/keepRules/. Always test a release build before tagging.

@@ -5,9 +5,25 @@
 [![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://opensource.org/licenses/)
 ![Workflow status](https://github.com/bruttazz/better-red/actions/workflows/release.yml/badge.svg)
 
+APK Download: [![Release](https://img.shields.io/github/release/bruttazz/better-red.svg?style=flat-square)](https://github.com/bruttazz/better-red/releases/latest)
+
+---
+
 > ⚠️ Vibe coded
 
-APK Download: [![Release](https://img.shields.io/github/release/bruttazz/better-red.svg?style=flat-square)](https://github.com/bruttazz/better-red/releases/latest)
+<!-- ai-footprint:start -->
+**🌍 AI footprint so far** · built with Claude Code
+
+| ⚡ Energy | 💧 Water | 🧠 Tokens processed | 💬 Sessions | 🔁 Model calls |
+|:-:|:-:|:-:|:-:|:-:|
+| **~5.2 kWh** | **~18 L** | 215.8 M | 5 | 660 |
+
+For reference: that's about the electricity a 1.5-ton AC uses in ~3.4 hours, and ~37 half-litre bottles of water.
+
+<sub>Model: Opus 5.5 (high). Estimated from Claude Code session logs (could be ~3× lower or higher); water includes on-site cooling (~2.2 L) and generating the electricity. Updated automatically, last on 2026-11-26. [How it's calculated](.claude/footprint/footprint.py).</sub>
+<!-- ai-footprint:end -->
+
+---
 
 A simple, private period tracker for Android. No account, no servers: everything stays in one
 SQLite file on the phone, which can be exported and imported from Profile.

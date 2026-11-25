@@ -1,0 +1,1 @@
+Reproducible build: F-Droid can now publish the same signed APK as GitHub releases.
